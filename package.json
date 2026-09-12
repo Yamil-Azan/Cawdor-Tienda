@@ -1,0 +1,12 @@
+{
+  "name": "cawdor-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend de Cawdor: genera cobros con Mercado Pago (Checkout Pro) para la tienda.",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "mercadopago": "^2.0.15"
+  }
+}
