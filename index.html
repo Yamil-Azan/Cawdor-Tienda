@@ -424,6 +424,23 @@
     display:inline-block;margin-top:6px;padding:4px 11px;border-radius:6px;
     background:var(--honey);color:#3A2A0A;font-size:11.5px;font-weight:800;
   }
+  .pay-option-icon{flex-shrink:0;color:var(--text-soft);display:flex;align-items:center;justify-content:center;}
+  .pay-option.active .pay-option-icon{color:var(--sage-dark);}
+  .mp-panel{
+    background:var(--bg-alt);border:1px solid var(--border);border-radius:10px;
+    margin-top:-2px;padding:16px 16px 14px;
+  }
+  .mp-panel-title{font-weight:800;font-size:13.5px;text-align:center;margin-bottom:12px;}
+  .mp-benefits{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;}
+  .mp-benefit{display:flex;gap:9px;align-items:flex-start;}
+  .mp-benefit svg{margin-top:1px;}
+  .mp-benefit strong{display:block;font-size:12px;}
+  .mp-benefit span{display:block;font-size:11px;color:var(--text-soft);margin-top:2px;}
+  .mp-brands{text-align:center;font-size:11px;color:var(--text-soft);letter-spacing:.02em;margin-bottom:10px;}
+  .mp-footer-note{background:var(--paper);border:1px solid var(--border);border-radius:10px;padding:11px 14px;text-align:center;}
+  .mp-footer-note strong{display:block;font-size:12px;}
+  .mp-footer-note span{font-size:11px;color:var(--text-soft);}
+  @media (max-width: 480px){ .mp-benefits{grid-template-columns:1fr;} }
   /* admin */
   .admin-gate{max-width:380px;margin:70px auto;padding:32px;background:var(--paper);border:1px solid var(--border);border-radius:var(--radius);text-align:center;position:relative;}
   .admin-gate-close{
@@ -1189,11 +1206,13 @@ document.getElementById('drawerOverlay').onclick = closeDrawer;
 function closeDrawer(){ document.getElementById('cartDrawer').classList.remove('open'); document.getElementById('drawerOverlay').classList.remove('open'); confirmingClear = false; }
 
 /* ---------- CHECKOUT ---------- */
-let payMethod = 'transferencia';
+let payMethod = 'mercadopago';
 let selectedCardPlanIndex = 0;
+let checkoutStep = 1;
 function openCheckout(){
   if(cart.length===0) return;
   closeDrawer();
+  checkoutStep = 1;
   renderCheckout();
   document.getElementById('checkoutOverlay').classList.add('open');
 }
@@ -1205,6 +1224,7 @@ function renderCheckout(){
       <p class="pm-desc" style="margin-top:2px;">Completá tus datos de envío y elegí cómo querés pagar.</p>
       <form id="checkoutForm" novalidate>
         <div class="form-error-banner" id="formErrorBanner">⚠️ Faltan completar algunos campos obligatorios. Revisá lo marcado en rojo más abajo.</div>
+        <div id="checkoutStep1" style="display:${checkoutStep===1?'block':'none'};">
         <div class="eyebrow" style="margin:14px 0 8px;">Datos de contacto</div>
         <div class="form-grid">
           <div class="field"><label>Nombre y apellido</label><input required name="fullname" placeholder="María Gómez"><span class="field-error-msg">Completá tu nombre y apellido</span></div>
@@ -1226,21 +1246,46 @@ function renderCheckout(){
           <label>Notas para tu pedido</label>
           <textarea name="notes" rows="5" placeholder="Ej: dejar en portería, timbre roto, horario de entrega preferido..."></textarea>
         </div>
+        <button type="button" class="btn btn-sage" style="width:100%;justify-content:center;" id="continueToPaymentBtn">Continuar con la compra</button>
+        </div>
+        <div id="checkoutStep2" style="display:${checkoutStep===2?'block':'none'};">
+        <button type="button" class="clear-cart-link" id="backToStep1" style="margin-bottom:10px;">← Volver a mis datos</button>
         <div class="eyebrow" style="margin:6px 0 8px;">Método de pago</div>
         <div class="pay-options" id="payOptions">
-          ${payOption('transferencia','Transferencia bancaria', 'Sin recargo, mismo precio publicado')}
-          ${payOption('debito','Tarjeta de débito', 'Sin recargo, mismo precio publicado')}
-          ${payOption('tarjeta','Tarjeta de crédito', '')}
+          ${payOption('mercadopago','Pagar con Mercado Pago', 'Tarjetas, débito, efectivo y más', PAY_ICONS.mercadopago)}
+          <div id="mpInfoPanel" style="display:${payMethod==='mercadopago'?'block':'none'};">${mpInfoPanelHtml()}</div>
+          ${payOption('transferencia','Transferencia bancaria', 'Sin recargo, mismo precio publicado', PAY_ICONS.bank)}
+          ${payOption('debito','Tarjeta de débito', 'Sin recargo, mismo precio publicado', PAY_ICONS.card)}
+          ${payOption('tarjeta','Tarjeta de crédito', '', PAY_ICONS.card)}
           <div id="cardPlansWrap" style="display:${payMethod==='tarjeta'?'flex':'none'};flex-direction:column;gap:8px;padding-left:34px;margin-top:-4px;">
             ${CARD_PLANS.map((plan,i)=>cardPlanOption(plan,i)).join('')}
           </div>
-          ${payOption('gocuotas','GOcuotas', `Hasta ${GOCUOTAS_INSTALLMENTS} cuotas sin interés, mismo precio publicado`)}
+          ${payOption('gocuotas','GOcuotas', `Hasta ${GOCUOTAS_INSTALLMENTS} cuotas sin interés, mismo precio publicado`, PAY_ICONS.calendar)}
         </div>
         <button type="submit" class="btn btn-sage" style="width:100%;justify-content:center;" id="confirmOrderBtn">Confirmar pedido — ${money(getOrderTotal())}</button>
+        </div>
       </form>
     </div>
   `;
   document.getElementById('closeCheckout').onclick = ()=>document.getElementById('checkoutOverlay').classList.remove('open');
+  document.getElementById('continueToPaymentBtn').onclick = ()=>{
+    const form = document.getElementById('checkoutForm');
+    const banner = document.getElementById('formErrorBanner');
+    const firstInvalid = validateCheckoutFields(form);
+    if(firstInvalid){
+      banner.classList.add('show');
+      const modal = document.getElementById('checkoutModal');
+      if(modal) modal.scrollTop = 0;
+      firstInvalid.focus();
+      if(typeof firstInvalid.scrollIntoView === 'function'){
+        firstInvalid.scrollIntoView({behavior:'smooth', block:'center'});
+      }
+      return;
+    }
+    banner.classList.remove('show');
+    goToCheckoutStep(2);
+  };
+  document.getElementById('backToStep1').onclick = ()=> goToCheckoutStep(1);
   document.querySelectorAll('#payOptions .pay-option').forEach(el=>{
     el.onclick=()=>{
       payMethod = el.dataset.pay;
@@ -1252,6 +1297,8 @@ function renderCheckout(){
       });
       const plansWrap = document.getElementById('cardPlansWrap');
       if(plansWrap) plansWrap.style.display = (payMethod==='tarjeta') ? 'flex' : 'none';
+      const mpPanel = document.getElementById('mpInfoPanel');
+      if(mpPanel) mpPanel.style.display = (payMethod==='mercadopago') ? 'block' : 'none';
       updateConfirmButtonTotal();
     };
   });
@@ -1286,7 +1333,11 @@ function renderCheckout(){
   document.getElementById('checkoutForm').addEventListener('keydown', (ev)=>{
     if(ev.key === 'Enter' && ev.target.tagName !== 'TEXTAREA'){
       ev.preventDefault();
-      handleCheckoutSubmit({ preventDefault(){}, target: document.getElementById('checkoutForm') });
+      if(checkoutStep === 1){
+        document.getElementById('continueToPaymentBtn').click();
+      } else {
+        handleCheckoutSubmit({ preventDefault(){}, target: document.getElementById('checkoutForm') });
+      }
     }
   });
   document.querySelectorAll('#checkoutForm input[required], #checkoutForm textarea[required]').forEach(input=>{
@@ -1297,11 +1348,61 @@ function renderCheckout(){
     });
   });
 }
-function payOption(value,title,badge){
+function goToCheckoutStep(n){
+  checkoutStep = n;
+  const s1 = document.getElementById('checkoutStep1');
+  const s2 = document.getElementById('checkoutStep2');
+  if(s1) s1.style.display = n===1 ? 'block' : 'none';
+  if(s2) s2.style.display = n===2 ? 'block' : 'none';
+  const modal = document.getElementById('checkoutModal');
+  if(modal) modal.scrollTop = 0;
+}
+function validateCheckoutFields(form){
+  let firstInvalid = null;
+  form.querySelectorAll('.field-error').forEach(el=>el.classList.remove('field-error'));
+  form.querySelectorAll('.field-error-msg').forEach(el=>el.classList.remove('show'));
+  form.querySelectorAll('input[required], textarea[required]').forEach(input=>{
+    const value = input.value.trim();
+    let invalid = value === '';
+    if(!invalid && input.type === 'email'){
+      invalid = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    }
+    if(invalid){
+      input.classList.add('field-error');
+      const msg = input.parentElement.querySelector('.field-error-msg');
+      if(msg) msg.classList.add('show');
+      if(!firstInvalid) firstInvalid = input;
+    }
+  });
+  return firstInvalid;
+}
+const PAY_ICONS = {
+  mercadopago: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h18M3 8v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8M3 8l2-4h14l2 4"/><path d="M8 15h4"/></svg>`,
+  bank: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-6 9 6"/><path d="M5 10v9M9.5 10v9M14.5 10v9M19 10v9"/><path d="M3 21h18"/></svg>`,
+  card: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.2"/><path d="M2.5 10h19"/></svg>`,
+  calendar: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2.2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
+  wallet: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h13A2.5 2.5 0 0 1 21 7.5V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M16 12.5h3M16 12.5a1.2 1.2 0 1 0 0 .01Z"/></svg>`,
+  clock: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>`
+};
+function mpInfoPanelHtml(){
+  return `
+    <div class="mp-panel">
+      <div class="mp-panel-title">Pagá con tu cuenta de Mercado Pago</div>
+      <div class="mp-benefits">
+        <div class="mp-benefit">${PAY_ICONS.wallet}<div><strong>Usá tus tarjetas guardadas</strong><span>Dinero disponible y mucho más.</span></div></div>
+        <div class="mp-benefit">${PAY_ICONS.clock}<div><strong>Accedé a cuotas sin tarjeta</strong><span>Para comprar ahora y pagar después.</span></div></div>
+      </div>
+      <div class="mp-brands">Visa · Mastercard · Amex · Cabal · Naranja</div>
+      <div class="mp-footer-note"><strong>Te llevaremos a Mercado Pago</strong><span>Si no tenés cuenta, podés pagar como invitado.</span></div>
+    </div>
+  `;
+}
+function payOption(value,title,badge,icon){
   const active = payMethod===value;
   return `<label class="pay-option ${active?'active':''}" data-pay="${value}">
     <input type="radio" name="pay" value="${value}" ${active?'checked':''} style="pointer-events:none;">
-    <div><div style="font-weight:700;font-size:13.5px;">${title}</div>${badge?`<span class="pay-badge">${badge}</span>`:''}</div>
+    <div style="flex:1;"><div style="font-weight:700;font-size:13.5px;">${title}</div>${badge?`<span class="pay-badge">${badge}</span>`:''}</div>
+    ${icon?`<div class="pay-option-icon">${icon}</div>`:''}
   </label>`;
 }
 function cardPlanOption(plan, index){
@@ -1329,25 +1430,12 @@ async function handleCheckoutSubmit(e){
   const banner = document.getElementById('formErrorBanner');
 
   // Validación propia (no dependemos del validador nativo del navegador,
-  // que puede no mostrarse dentro de un modal/iframe).
-  let firstInvalid = null;
-  form.querySelectorAll('.field-error').forEach(el=>el.classList.remove('field-error'));
-  form.querySelectorAll('.field-error-msg').forEach(el=>el.classList.remove('show'));
-  form.querySelectorAll('input[required], textarea[required]').forEach(input=>{
-    const value = input.value.trim();
-    let invalid = value === '';
-    if(!invalid && input.type === 'email'){
-      invalid = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-    }
-    if(invalid){
-      input.classList.add('field-error');
-      const msg = input.parentElement.querySelector('.field-error-msg');
-      if(msg) msg.classList.add('show');
-      if(!firstInvalid) firstInvalid = input;
-    }
-  });
+  // que puede no mostrarse dentro de un modal/iframe). Ya se corrió una vez
+  // al pasar del paso 1 al paso 2, pero se repite acá como respaldo.
+  const firstInvalid = validateCheckoutFields(form);
 
   if(firstInvalid){
+    goToCheckoutStep(1);
     banner.classList.add('show');
     const modal = document.getElementById('checkoutModal');
     if(modal) modal.scrollTop = 0;
@@ -1376,6 +1464,41 @@ async function handleCheckoutSubmit(e){
     cardInstallments: payMethod === 'tarjeta' ? CARD_PLANS[selectedCardPlanIndex].cuotas : null,
     status: 'pendiente'
   };
+  if (payMethod === 'mercadopago') {
+    const confirmBtn = document.getElementById('confirmOrderBtn');
+    if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Redirigiendo a Mercado Pago...'; }
+    try {
+      const resp = await fetch('/api/create-preference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: order.id,
+          items: order.items.map(i => ({ name: i.name, price: i.price, qty: i.qty })),
+          payer: { email: order.customer.email, name: order.customer.name, phone: order.customer.phone }
+        })
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.init_point) {
+        throw new Error(data.error || 'No se pudo generar el link de pago');
+      }
+      // descontar stock y guardar el pedido como pendiente antes de salir hacia Mercado Pago
+      cart.forEach(i=>{
+        const p = products.find(x=>x.id===i.productId);
+        if(p) p.stock = Math.max(0, p.stock - i.qty);
+      });
+      orders.push(order);
+      await Promise.all([saveOrders(), saveProducts()]);
+      cart = [];
+      await saveCart();
+      window.location.href = data.init_point;
+    } catch (err) {
+      if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = `Confirmar pedido — ${money(getOrderTotal())}`; }
+      banner.textContent = '⚠️ ' + (err.message || 'No se pudo conectar con Mercado Pago. Probá de nuevo en unos minutos.');
+      banner.classList.add('show');
+    }
+    return;
+  }
+
   // descontar stock
   cart.forEach(i=>{
     const p = products.find(x=>x.id===i.productId);
