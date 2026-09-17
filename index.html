@@ -820,6 +820,36 @@
 <div class="toast" id="toast"></div>
 
 <script>
+  window.storage = {
+  async get(key, shared) {
+    if (!shared) {
+      try {
+        const raw = localStorage.getItem('cawdor_' + key);
+        return raw !== null ? { key, value: raw, shared: false } : null;
+      } catch(e){ return null; }
+    }
+    try {
+      const res = await fetch('/api/storage?key=' + encodeURIComponent(key));
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.value === null || data.value === undefined) return null;
+      return { key, value: data.value, shared: true };
+    } catch(e){ return null; }
+  },
+  async set(key, value, shared) {
+    if (!shared) {
+      try { localStorage.setItem('cawdor_' + key, value); } catch(e){}
+      return { key, value, shared: false };
+    }
+    const res = await fetch('/api/storage', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ key, value })
+    });
+    if (!res.ok) throw new Error('No se pudo guardar');
+    return { key, value, shared: true };
+  }
+};
 const money = n => '$' + Number(n).toLocaleString('es-AR');
 const TYPE_LABELS = {
   body:'Bodys', conjunto:'Conjuntos', pantalon:'Pantalones', remera:'Remeras',
