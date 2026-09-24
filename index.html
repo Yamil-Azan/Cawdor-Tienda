@@ -1286,10 +1286,6 @@ function renderCheckout(){
           <div id="mpInfoPanel" style="display:${payMethod==='mercadopago'?'block':'none'};">${mpInfoPanelHtml()}</div>
           ${payOption('transferencia','Transferencia bancaria', 'Sin recargo, mismo precio publicado', PAY_ICONS.bank)}
           ${payOption('debito','Tarjeta de débito', 'Sin recargo, mismo precio publicado', PAY_ICONS.card)}
-          ${payOption('tarjeta','Tarjeta de crédito', '', PAY_ICONS.card)}
-          <div id="cardPlansWrap" style="display:${payMethod==='tarjeta'?'flex':'none'};flex-direction:column;gap:8px;padding-left:34px;margin-top:-4px;">
-            ${CARD_PLANS.map((plan,i)=>cardPlanOption(plan,i)).join('')}
-          </div>
           ${payOption('gocuotas','GOcuotas', `Hasta ${GOCUOTAS_INSTALLMENTS} cuotas sin interés, mismo precio publicado`, PAY_ICONS.calendar)}
         </div>
         <button type="submit" class="btn btn-sage" style="width:100%;justify-content:center;" id="confirmOrderBtn">Confirmar pedido — ${money(getOrderTotal())}</button>
