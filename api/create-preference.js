@@ -65,7 +65,7 @@ module.exports = async (req, res) => {
       },
       auto_return: 'approved',
       payment_methods: {
-        installments: Number.isFinite(Number(installments)) ? Number(installments) : 1
+        installments: Number.isFinite(Number(installments)) && Number(installments) > 0 ? Number(installments) : 12
       }
     };
 
