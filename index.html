@@ -1893,11 +1893,31 @@ function showCsvTemplateManually(){
   }
 }
 
-// Parser simple de CSV: soporta comas dentro de campos entre comillas.
-function parseCsv(text){
+// Parser simple de CSV: soporta comas dentro de campos entre comillas, y detecta si el separador es , o ;
+function parseNumberAR(raw){
+  if(raw===undefined || raw===null) return NaN;
+  let s = String(raw).trim().replace(/[^0-9.,-]/g,'');
+  if(!s) return NaN;
+  const hasDot = s.includes('.'), hasComma = s.includes(',');
+  if(hasDot && hasComma){
+    // Formato argentino: punto de miles, coma decimal -> "12.500,00"
+    s = s.replace(/\./g,'').replace(',', '.');
+  } else if(hasComma){
+    // Solo coma: la tratamos como decimal -> "12500,50"
+    s = s.replace(',', '.');
+  }
+  return Number(s);
+}
+function parseCsv(text, delimiter){
   const rows = [];
   let row = [], field = '', inQuotes = false;
-  text = text.replace(/\r\n/g, '\n');
+  text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+  if(!delimiter){
+    const firstLine = text.split('\n')[0] || '';
+    const commas = (firstLine.match(/,/g)||[]).length;
+    const semis = (firstLine.match(/;/g)||[]).length;
+    delimiter = semis > commas ? ';' : ',';
+  }
   for(let i=0; i<text.length; i++){
     const ch = text[i];
     if(inQuotes){
@@ -1906,7 +1926,7 @@ function parseCsv(text){
       } else { field += ch; }
     } else {
       if(ch === '"'){ inQuotes = true; }
-      else if(ch === ','){ row.push(field); field = ''; }
+      else if(ch === delimiter){ row.push(field); field = ''; }
       else if(ch === '\n'){ row.push(field); rows.push(row); row = []; field = ''; }
       else { field += ch; }
     }
@@ -1937,12 +1957,13 @@ function handleCsvImport(ev){
       showToast('El archivo no tiene filas de productos');
       return;
     }
-    const headerRow = rows[0].map(h=>h.trim().toLowerCase());
+    const normHeader = h => h.trim().toLowerCase().replace(/[_\s]+/g,'');
+    const headerRow = rows[0].map(normHeader);
     const idx = {
       name: headerRow.indexOf('nombre'),
       type: headerRow.indexOf('categoria') !== -1 ? headerRow.indexOf('categoria') : headerRow.indexOf('tipo'),
       price: headerRow.indexOf('precio'),
-      originalPrice: headerRow.indexOf('precio_anterior'),
+      originalPrice: headerRow.indexOf('precioanterior'),
       stock: headerRow.indexOf('stock'),
       sizes: headerRow.indexOf('talles'),
       desc: headerRow.indexOf('descripcion')
@@ -1957,9 +1978,9 @@ function handleCsvImport(ev){
       const r = rows[i];
       const name = (r[idx.name]||'').trim();
       const typeRaw = (r[idx.type]||'').trim().toLowerCase().replace(/\s+/g,'');
-      const price = Number(r[idx.price]);
-      const originalPriceRaw = idx.originalPrice!==-1 ? Number(r[idx.originalPrice]) : NaN;
-      const stock = idx.stock!==-1 ? Number(r[idx.stock]||0) : 0;
+      const price = parseNumberAR(r[idx.price]);
+      const originalPriceRaw = idx.originalPrice!==-1 ? parseNumberAR(r[idx.originalPrice]) : NaN;
+      const stock = idx.stock!==-1 ? parseNumberAR(r[idx.stock]||'0') : 0;
       const sizes = idx.sizes!==-1 && r[idx.sizes] ? r[idx.sizes].split('|').map(s=>s.trim()).filter(Boolean) : ['Única'];
       const desc = idx.desc!==-1 ? (r[idx.desc]||'') : '';
       const type = TYPE_ALIASES[typeRaw];
