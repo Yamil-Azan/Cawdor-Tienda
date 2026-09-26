@@ -440,6 +440,42 @@
   .mp-footer-note{background:var(--paper);border:1px solid var(--border);border-radius:10px;padding:11px 14px;text-align:center;}
   .mp-footer-note strong{display:block;font-size:12px;}
   .mp-footer-note span{font-size:11px;color:var(--text-soft);}
+  /* Panel de GOcuotas: aviso de redirección + plan de cuotas */
+  .gc-panel{
+    background:var(--bg-alt);border:1px solid var(--border);border-radius:10px;
+    margin-top:-2px;padding:16px 16px 14px;
+  }
+  .gc-intro{font-size:12.5px;line-height:1.5;margin:0 0 12px;}
+  .gc-method{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--text-soft);margin-bottom:8px;}
+  .gc-method svg{width:18px;height:18px;}
+  .gc-brands{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+  .gc-brand{background:var(--paper);border:1px solid var(--border);border-radius:6px;padding:5px 9px;font-size:11px;font-weight:700;}
+  .gc-plan{background:var(--paper);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+  .gc-plan-head{
+    display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;
+    background:color-mix(in srgb, var(--sage) 14%, transparent);
+  }
+  .gc-plan-head strong{font-size:16px;font-weight:800;}
+  .gc-pill{
+    font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;color:var(--sage-dark);
+    background:color-mix(in srgb, var(--sage) 22%, transparent);
+  }
+  .gc-rows{list-style:none;margin:0;padding:4px 16px;}
+  .gc-row{position:relative;display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .gc-row:last-child{border-bottom:none;}
+  .gc-row:not(:last-child)::before{
+    content:'';position:absolute;left:5px;top:calc(50% + 8px);height:calc(100% - 16px);
+    width:2px;background:var(--border);
+  }
+  .gc-dot{width:12px;height:12px;border-radius:50%;border:2px solid var(--border);background:var(--paper);flex-shrink:0;box-sizing:border-box;}
+  .gc-row.is-today .gc-dot{border-color:var(--sage);background:var(--sage);}
+  .gc-month{flex:1;}
+  .gc-today{
+    font-size:11px;font-weight:800;color:var(--sage-dark);padding:2px 8px;border-radius:999px;margin-right:8px;
+    background:color-mix(in srgb, var(--sage) 18%, transparent);
+  }
+  .gc-amount{font-weight:800;white-space:nowrap;}
+  .gc-total{border-top:1px solid var(--border);text-align:center;padding:12px;font-weight:800;font-size:13.5px;}
   @media (max-width: 480px){ .mp-benefits{grid-template-columns:1fr;} }
   /* admin */
   .admin-gate{max-width:380px;margin:70px auto;padding:32px;background:var(--paper);border:1px solid var(--border);border-radius:var(--radius);text-align:center;position:relative;}
@@ -1282,11 +1318,11 @@ function renderCheckout(){
         <button type="button" class="clear-cart-link" id="backToStep1" style="margin-bottom:10px;">← Volver a mis datos</button>
         <div class="eyebrow" style="margin:6px 0 8px;">Método de pago</div>
         <div class="pay-options" id="payOptions">
-          ${payOption('mercadopago','Pagar con Mercado Pago', 'Tarjetas, débito, efectivo y más', PAY_ICONS.mercadopago)}
+          ${payOption('mercadopago','Pagar con Mercado Pago', 'Crédito y débito', PAY_ICONS.mercadopago)}
           <div id="mpInfoPanel" style="display:${payMethod==='mercadopago'?'block':'none'};">${mpInfoPanelHtml()}</div>
           ${payOption('transferencia','Transferencia bancaria', 'Sin recargo, mismo precio publicado', PAY_ICONS.bank)}
-          ${payOption('debito','Tarjeta de débito', 'Sin recargo, mismo precio publicado', PAY_ICONS.card)}
           ${payOption('gocuotas','GOcuotas', `Hasta ${GOCUOTAS_INSTALLMENTS} cuotas sin interés, mismo precio publicado`, PAY_ICONS.calendar)}
+          <div id="gcInfoPanel" style="display:${payMethod==='gocuotas'?'block':'none'};">${gcInfoPanelHtml()}</div>
         </div>
         <button type="submit" class="btn btn-sage" style="width:100%;justify-content:center;" id="confirmOrderBtn">Confirmar pedido — ${money(getOrderTotal())}</button>
         </div>
@@ -1325,6 +1361,8 @@ function renderCheckout(){
       if(plansWrap) plansWrap.style.display = (payMethod==='tarjeta') ? 'flex' : 'none';
       const mpPanel = document.getElementById('mpInfoPanel');
       if(mpPanel) mpPanel.style.display = (payMethod==='mercadopago') ? 'block' : 'none';
+      const gcPanel = document.getElementById('gcInfoPanel');
+      if(gcPanel) gcPanel.style.display = (payMethod==='gocuotas') ? 'block' : 'none';
       updateConfirmButtonTotal();
     };
   });
@@ -1420,6 +1458,52 @@ function mpInfoPanelHtml(){
       </div>
       <div class="mp-brands">Visa · Mastercard · Amex · Cabal · Naranja</div>
       <div class="mp-footer-note"><strong>Te llevaremos a Mercado Pago</strong><span>Si no tenés cuenta, podés pagar como invitado.</span></div>
+    </div>
+  `;
+}
+const moneyCents = n => '$' + Number(n).toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
+// Divide el total en cuotas iguales (en centavos). Si sobra algún centavo
+// por redondeo, se suma a la primera cuota (la que se paga hoy).
+function gocuotasSchedule(total, n){
+  const totalCents = Math.round(total * 100);
+  const base = Math.floor(totalCents / n);
+  const remainder = totalCents - base * n;
+  const now = new Date();
+  return Array.from({length:n}, (_, i)=>{
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const month = d.toLocaleString('es-AR', {month:'long'});
+    return {
+      month: month.charAt(0).toUpperCase() + month.slice(1),
+      amount: (base + (i === 0 ? remainder : 0)) / 100,
+      today: i === 0
+    };
+  });
+}
+function gcInfoPanelHtml(){
+  const total = cartTotal();
+  const schedule = gocuotasSchedule(total, GOCUOTAS_INSTALLMENTS);
+  return `
+    <div class="gc-panel">
+      <p class="gc-intro">Si elegís <strong>pagar a través de GOcuotas</strong>, te vamos a redirigir para que completes el pago con:</p>
+      <div class="gc-method">${PAY_ICONS.card}<span>Tarjeta de débito</span></div>
+      <div class="gc-brands">
+        <span class="gc-brand">Visa Débito</span>
+        <span class="gc-brand">Mastercard Débito</span>
+        <span class="gc-brand">Maestro</span>
+      </div>
+      <div class="gc-plan">
+        <div class="gc-plan-head"><strong>${GOCUOTAS_INSTALLMENTS} cuotas</strong><span class="gc-pill">Sin interés</span></div>
+        <ul class="gc-rows">
+          ${schedule.map(c=>`
+            <li class="gc-row ${c.today?'is-today':''}">
+              <span class="gc-dot"></span>
+              <span class="gc-month">${c.month}</span>
+              ${c.today?'<span class="gc-today">Hoy</span>':''}
+              <span class="gc-amount">${moneyCents(c.amount)}</span>
+            </li>`).join('')}
+        </ul>
+        <div class="gc-total">Total a pagar ${moneyCents(total)}</div>
+      </div>
     </div>
   `;
 }
