@@ -913,9 +913,9 @@ const money = n => '$' + Number(n).toLocaleString('es-AR');
 const TYPE_LABELS = {
   body:'Bodys', conjunto:'Conjuntos', pantalon:'Pantalones', remera:'Remeras',
   accesorio:'Accesorios', media:'Medias', nidito:'Niditos y almohadones de amamantar',
-  combo:'Combos'
+  combo:'Combos', ajuar:'Ajuares'
 };
-const TYPE_ORDER = ['body','conjunto','pantalon','remera','accesorio','media','nidito','combo'];
+const TYPE_ORDER = ['body','conjunto','pantalon','remera','accesorio','media','nidito','combo','ajuar'];
 const SIZE_OPTIONS = ['RN','0-3M','3-6M','6-9M','9-12M','6-12M','12-18M','18-24M','Única'];
 const GOCUOTAS_INSTALLMENTS = 3;
 document.addEventListener('DOMContentLoaded', () => {
@@ -977,7 +977,8 @@ function iconFor(type,color){
     accesorio:`<path d="M50 18 a24 24 0 0 1 24 24 L26 42 a24 24 0 0 1 24 -24 Z" fill="${c}" opacity="0.85"/><rect x="24" y="42" width="52" height="9" rx="4" fill="${c}"/>`,
     media:`<path d="M40 14 h20 v34 q18 4 18 26 a14 14 0 0 1 -14 14 h-10 q-4 0 -4 -6 v-16 h-10 q-4 0 -4 -4 v-48 z" fill="${c}" opacity="0.85"/>`,
     nidito:`<path d="M20 60 a30 30 0 0 1 60 0 q0 22 -30 22 t-30 -22 z" fill="${c}" opacity="0.55"/><circle cx="50" cy="52" r="16" fill="${c}" opacity="0.9"/>`,
-    combo:`<rect x="22" y="30" width="56" height="46" rx="8" fill="${c}" opacity="0.55"/><path d="M22 44 h56" stroke="${c}" stroke-width="4"/><path d="M50 30 v46 M42 30 q0 -14 8 -14 t8 14" stroke="${c}" stroke-width="4" fill="none"/>`
+    combo:`<rect x="22" y="30" width="56" height="46" rx="8" fill="${c}" opacity="0.55"/><path d="M22 44 h56" stroke="${c}" stroke-width="4"/><path d="M50 30 v46 M42 30 q0 -14 8 -14 t8 14" stroke="${c}" stroke-width="4" fill="none"/>`,
+    ajuar:`<path d="M24 34 a26 12 0 0 1 52 0 v30 a26 12 0 0 1 -52 0 z" fill="${c}" opacity="0.55"/><path d="M24 34 a26 12 0 0 0 52 0 a26 12 0 0 1 -52 0" fill="${c}" opacity="0.9"/><circle cx="50" cy="34" r="6" fill="${c}"/>`
   };
   return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="max-width:150px;">${shapes[type]||shapes.body}</svg>`;
 }
@@ -1863,7 +1864,7 @@ function renderAdminProducts(){
 }
 function downloadCsvTemplate(){
   const header = 'nombre,categoria,precio,precio_anterior,stock,talles,descripcion\n';
-  const example = 'Ejemplo body manga corta,body,5200,,10,"0-3M","Body de algodón suave"\n';
+  const example = 'Ajuar,ajuar,12500,,20,"0-1","Algodón pima. 3 piezas"\n';
   const csv = header + example;
 
   try{
@@ -1882,11 +1883,11 @@ function downloadCsvTemplate(){
 
 function showCsvTemplateManually(){
   const header = 'nombre,categoria,precio,precio_anterior,stock,talles,descripcion\n';
-  const example = 'Ejemplo body manga corta,body,5200,,10,"0-3M","Body de algodón suave"\n';
+  const example = 'Ajuar,ajuar,12500,,20,"0-1","Algodón pima. 3 piezas"\n';
   const csv = header + example;
   const win = window.open('', '_blank');
   if(win){
-    win.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">${csv.replace(/</g,'&lt;')}</pre><p style="font-family:sans-serif;color:#555;padding:0 20px;">Seleccioná todo este texto (Ctrl/Cmd+A), copialo, y pegalo en un archivo nuevo llamado <b>plantilla_productos_cawdor.csv</b> desde el Bloc de notas, Excel o Google Sheets.<br><br>Categorías válidas: body, conjunto, pantalon, remera, accesorio, media, nidito, combo.<br>"precio_anterior" es opcional: completalo solo si el producto está en oferta.</p>`);
+    win.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">${csv.replace(/</g,'&lt;')}</pre><p style="font-family:sans-serif;color:#555;padding:0 20px;">Seleccioná todo este texto (Ctrl/Cmd+A), copialo, y pegalo en un archivo nuevo llamado <b>plantilla_productos_cawdor.csv</b> desde el Bloc de notas, Excel o Google Sheets.<br><br>Categorías válidas: body, conjunto, pantalon, remera, accesorio, media, nidito, combo, ajuar.<br>"precio_anterior" es opcional: completalo solo si el producto está en oferta.</p>`);
   } else {
     showToast('Tu navegador bloqueó la ventana emergente. Habilitala e intentá de nuevo.');
   }
@@ -1922,7 +1923,8 @@ const TYPE_ALIASES = {
   accesorio:'accesorio', accesorios:'accesorio',
   media:'media', medias:'media',
   nidito:'nidito', niditos:'nidito', 'niditosyalmohadonesdeamamantar':'nidito', almohadon:'nidito', almohadones:'nidito',
-  combo:'combo', combos:'combo'
+  combo:'combo', combos:'combo',
+  ajuar:'ajuar', ajuares:'ajuar'
 };
 
 function handleCsvImport(ev){
