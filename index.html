@@ -272,6 +272,8 @@
     aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
     padding:22px;cursor:pointer;position:relative;background:var(--bg-alt);
   }
+  .card-media.has-img{padding:0;overflow:hidden;}
+  .card-media.has-img img{display:block;width:100%;height:100%;object-fit:cover;}
   .card-body{padding:14px 16px 18px;display:flex;flex-direction:column;gap:8px;flex:1;}
   .card-title{font-family:'Fraunces',serif;font-weight:600;font-size:15.5px;cursor:pointer;line-height:1.3;}
   .card-meta{display:flex;gap:6px;flex-wrap:wrap;}
@@ -1109,7 +1111,7 @@ function renderGrid(){
       : `<button class="buy-btn" data-quickadd="${p.id}" ${p.stock===0?'disabled':''}>${p.stock===0?'Sin stock':'Comprar'}</button>`;
     return `
     <div class="card">
-      <div class="card-media" data-open="${p.id}">${mediaFor(p)}
+      <div class="card-media ${productImages(p).length?'has-img':''}" data-open="${p.id}">${mediaFor(p)}
         ${p.originalPrice && p.originalPrice > p.price ? '<span class="offer-badge">OFERTA</span>' : ''}
       </div>
       <div class="card-body">
