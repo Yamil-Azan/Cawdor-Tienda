@@ -1118,8 +1118,6 @@ function renderGrid(){
         <div class="price-block">
           ${p.originalPrice && p.originalPrice > p.price ? `<span class="price-old">${money(p.originalPrice)}</span>` : ''}
           <span class="price">${money(p.price)}</span>
-          <span class="price-installments">Tarjeta: 1 pago sin interés</span>
-          <span class="price-transfer">3 y 6 cuotas con recargo desde 15%</span>
         </div>
         <div class="card-bottom">
           ${controls}
@@ -1210,8 +1208,6 @@ function renderProductModal(){
       <div class="price-block" style="margin-top:6px;">
         ${p.originalPrice && p.originalPrice > p.price ? `<span class="price-old" style="font-size:13px;">${money(p.originalPrice)}</span>` : ''}
         <span class="price" style="font-size:20px;">${money(p.price)}</span>
-        <span class="price-installments">Tarjeta: 1 pago sin interés</span>
-        <span class="price-transfer">3 y 6 cuotas con recargo desde 15%</span>
       </div>
       <p class="pm-desc">${p.desc}</p>
       <div class="eyebrow">Talle</div>
@@ -2450,7 +2446,8 @@ carouselEl.addEventListener('mouseleave', resetCarouselTimer);
 /* ---------- BARRA DE ANUNCIOS ---------- */
 const ANNOUNCEMENTS = [
   '🚚 Envíos a todo el país',
-  '🌱 Conocé la nueva temporada Cawdor'
+  '🌱 Conocé la nueva temporada Cawdor',
+  `💳 ${GOCUOTAS_INSTALLMENTS} cuotas sin interés con débito en GOcuotas`
 ];
 function renderAnnouncement(){
   const track = document.getElementById('announcementTrack');
