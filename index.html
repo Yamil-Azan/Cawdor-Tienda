@@ -2168,7 +2168,7 @@ function renderProductForm(id){
           <div class="field"><label>Categoría</label>
             <select name="type" required>${TYPE_ORDER.map(t=>`<option value="${t}" ${p&&p.type===t?'selected':''}>${TYPE_LABELS[t]}</option>`).join('')}</select>
           </div>
-          <div class="field"><label>Precio general (ARS)</label><input required type="number" min="0" name="price" value="${p?p.price:''}"><span style="font-size:11px;color:var(--text-soft);display:block;margin-top:4px;">Se usa para los talles o medidas sin precio propio.</span></div>
+          <div class="field"><label>Precio general (ARS)</label><input type="number" min="0" name="price" value="${p?p.price:''}" placeholder="Opcional si cada medida tiene su precio"><span style="font-size:11px;color:var(--text-soft);display:block;margin-top:4px;">Se usa para los talles o medidas sin precio propio.</span><span id="priceError" class="field-error-msg"></span></div>
           <div class="field"><label>Precio anterior (opcional, para oferta)</label><input type="number" min="0" name="originalPrice" value="${p&&p.originalPrice?p.originalPrice:''}" placeholder="Dejar vacío si no hay oferta"></div>
           <div class="field"><label>Stock</label><input required type="number" min="0" name="stock" value="${p?p.stock:''}"></div>
           <div class="field full">
@@ -2261,6 +2261,7 @@ function renderProductForm(id){
     renderSizePriceRows();
   }
   document.querySelector('#productForm select[name="type"]').addEventListener('change', renderSizeCheckboxes);
+  document.querySelector('#productForm input[name="price"]').addEventListener('input', ()=>document.getElementById('priceError').classList.remove('show'));
   renderSizeCheckboxes();
   document.getElementById('productImageInput').onchange = async (ev)=>{
     const files = Array.from(ev.target.files || []);
@@ -2295,10 +2296,24 @@ function renderProductForm(id){
     }
     const fd = new FormData(e.target);
     const originalPriceRaw = fd.get('originalPrice');
+    // El precio general solo es obligatorio si algún talle/medida no tiene precio propio.
+    // Si todas las medidas tienen precio, se guarda el más bajo como precio general.
+    let generalPrice = Number(fd.get('price'));
+    const missingPrice = selectedSizes.filter(s=>!sizePrices[s]);
+    if(!(generalPrice > 0)){
+      if(missingPrice.length){
+        const err = document.getElementById('priceError');
+        err.textContent = `Completá el precio general o poné precio a: ${missingPrice.join(', ')}`;
+        err.classList.add('show');
+        e.target.querySelector('input[name="price"]').focus();
+        return;
+      }
+      generalPrice = Math.min(...selectedSizes.map(s=>sizePrices[s]));
+    }
     const data = {
       name: fd.get('name'),
       type: fd.get('type'),
-      price: Number(fd.get('price')),
+      price: generalPrice,
       originalPrice: originalPriceRaw ? Number(originalPriceRaw) : null,
       stock: Number(fd.get('stock')),
       sizes: selectedSizes,
