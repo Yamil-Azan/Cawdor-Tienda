@@ -936,7 +936,7 @@ const TYPE_LABELS = {
 const TYPE_ORDER = ['body','conjunto','pantalon','remera','accesorio','media','nidito','combo','ajuar'];
 const SIZE_OPTIONS = ['RN','0-3M','3-6M','6-9M','9-12M','6-12M','12-18M','18-24M','24-36M','Única'];
 // Medidas en ml: solo se ofrecen para la categoría Accesorios (mamaderas, vasitos, etc.)
-const ACCESSORY_SIZE_OPTIONS = ['60 ml','120 ml','150 ml','250 ml','270 ml','330 ml'];
+const ACCESSORY_SIZE_OPTIONS = ['60 ml','120 ml','150 ml','180 ml','250 ml','270 ml','330 ml'];
 function sizeOptionsFor(type){
   return type === 'accesorio' ? [...ACCESSORY_SIZE_OPTIONS, ...SIZE_OPTIONS] : SIZE_OPTIONS;
 }
