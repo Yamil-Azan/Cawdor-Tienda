@@ -11,8 +11,13 @@ export default async function handler(req, res) {
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
   if (!SUPABASE_URL || !KEY) {
+    // Diagnóstico: muestra solo los NOMBRES de las variables que ve la función, nunca los valores.
     return res.status(500).json({
-      error: 'Faltan las variables SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en Vercel'
+      error: 'Faltan las variables SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en Vercel',
+      tieneUrl: Boolean(SUPABASE_URL),
+      tieneClave: Boolean(KEY),
+      entorno: process.env.VERCEL_ENV || null,
+      variablesQueVe: Object.keys(process.env).filter(k => /SUPA/i.test(k))
     });
   }
 
