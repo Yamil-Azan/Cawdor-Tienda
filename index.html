@@ -906,7 +906,7 @@
       } catch(e){ return null; }
     }
     try {
-      const res = await fetch('/api/storage?key=' + encodeURIComponent(key));
+      const res = await fetch('/api/storage?key=' + encodeURIComponent(key), { cache: 'no-store' });
       if (!res.ok) return null;
       const data = await res.json();
       if (data.value === null || data.value === undefined) return null;
@@ -1087,10 +1087,44 @@ async function ensureMamaderasOnly(){
 }
 
 async function saveProducts(){
-  try{ await window.storage.set('products', JSON.stringify(products), true); }catch(e){ showToast('No se pudo guardar (almacenamiento).'); }
+  try{ await window.storage.set('products', JSON.stringify(products), true); return true; }
+  catch(e){ showToast('⚠️ No se pudo guardar el catálogo. Probá de nuevo.'); return false; }
 }
 async function saveOrders(){
-  try{ await window.storage.set('orders', JSON.stringify(orders), true); }catch(e){ showToast('No se pudo guardar el pedido.'); }
+  try{ await window.storage.set('orders', JSON.stringify(orders), true); return true; }
+  catch(e){ showToast('No se pudo guardar el pedido.'); return false; }
+}
+// Antes de guardar se vuelve a leer la versión más reciente de la base de datos y el
+// cambio se aplica sobre esa. Así un navegador con una copia vieja (por ejemplo, un
+// cliente que abrió la tienda hace horas) no borra productos agregados después.
+async function updateProducts(mutator){
+  try{
+    const r = await window.storage.get('products', true);
+    if(r) products = JSON.parse(r.value);
+  }catch(e){}
+  mutator(products);
+  return await saveProducts();
+}
+async function updateOrders(mutator){
+  try{
+    const r = await window.storage.get('orders', true);
+    if(r) orders = JSON.parse(r.value);
+  }catch(e){}
+  mutator(orders);
+  return await saveOrders();
+}
+// Las fotos se suben a Supabase Storage y en el producto se guarda solo el link.
+function isDataUrl(src){ return typeof src === 'string' && src.startsWith('data:'); }
+async function uploadImage(dataUrl){
+  const res = await fetch('/api/upload-image', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ image: dataUrl })
+  });
+  let data = {};
+  try{ data = await res.json(); }catch(e){}
+  if(!res.ok || !data.url) throw new Error(data.error || ('Error ' + res.status));
+  return data.url;
 }
 async function saveCart(){
   try{ await window.storage.set('cart', JSON.stringify(cart), false); }catch(e){}
@@ -1779,12 +1813,15 @@ async function handleCheckoutSubmit(e){
         throw new Error(data.error || 'No se pudo generar el link de pago');
       }
       // descontar stock y guardar el pedido como pendiente antes de salir hacia Mercado Pago
-      cart.forEach(i=>{
-        const p = products.find(x=>x.id===i.productId);
-        if(p) p.stock = Math.max(0, p.stock - i.qty);
-      });
-      orders.push(order);
-      await Promise.all([saveOrders(), saveProducts()]);
+      await Promise.all([
+        updateOrders(list=>{ list.push(order); }),
+        updateProducts(list=>{
+          cart.forEach(it=>{
+            const p = list.find(x=>x.id===it.productId);
+            if(p) p.stock = Math.max(0, p.stock - it.qty);
+          });
+        })
+      ]);
       cart = [];
       await saveCart();
       window.location.href = data.init_point;
@@ -1804,12 +1841,15 @@ async function handleCheckoutSubmit(e){
 }
 async function finalizeOrder(order){
   // descontar stock
-  cart.forEach(i=>{
-    const p = products.find(x=>x.id===i.productId);
-    if(p) p.stock = Math.max(0, p.stock - i.qty);
-  });
-  orders.push(order);
-  await Promise.all([saveOrders(), saveProducts()]);
+  await Promise.all([
+    updateOrders(list=>{ list.push(order); }),
+    updateProducts(list=>{
+      cart.forEach(it=>{
+        const p = list.find(x=>x.id===it.productId);
+        if(p) p.stock = Math.max(0, p.stock - it.qty);
+      });
+    })
+  ]);
   cart = [];
   await saveCart();
   updateCartCount();
@@ -1915,6 +1955,42 @@ function renderAdmin(){
   el.querySelectorAll('.admin-tabs .chip').forEach(b=>b.onclick=()=>{adminTab=b.dataset.tab; renderAdmin();});
   if(adminTab==='productos') renderAdminProducts(); else renderAdminOrders();
 }
+function renderImageMigrationBanner(){
+  const pending = [];
+  products.forEach(p=>productImages(p).forEach(src=>{ if(isDataUrl(src) && !pending.includes(src)) pending.push(src); }));
+  const holder = document.getElementById('importSummary');
+  if(!holder || !pending.length) return;
+  holder.insertAdjacentHTML('beforebegin', `
+    <div id="migrateBanner" class="form-error-banner show" style="margin-bottom:14px;">
+      Hay ${pending.length} foto${pending.length!==1?'s':''} guardada${pending.length!==1?'s':''} dentro del catálogo, y eso lo hace muy pesado.
+      Pasalas a Supabase Storage una sola vez para poder seguir cargando productos sin límite.
+      <div style="margin-top:10px;"><button class="btn btn-sage" id="migrateImgsBtn">Pasar fotos a Supabase</button></div>
+    </div>`);
+  document.getElementById('migrateImgsBtn').onclick = async (ev)=>{
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    const map = new Map();
+    let failed = 0;
+    for(let i=0; i<pending.length; i++){
+      btn.textContent = `Subiendo ${i+1} de ${pending.length}…`;
+      try{ map.set(pending[i], await uploadImage(pending[i])); }
+      catch(e){ failed++; console.error(e); }
+    }
+    btn.textContent = 'Guardando catálogo…';
+    const swap = src => map.get(src) || src;
+    const ok = await updateProducts(list=>{
+      list.forEach(p=>{
+        if(Array.isArray(p.images)) p.images = p.images.map(swap);
+        if(p.image) p.image = swap(p.image);
+      });
+    });
+    renderAdminProducts();
+    renderGrid();
+    if(!ok) showToast('No se pudo guardar el catálogo. Probá de nuevo.');
+    else if(failed) showToast(`Listo, pero ${failed} foto${failed!==1?'s':''} no se pudieron subir. Probá de nuevo.`);
+    else showToast('¡Listo! Todas las fotos quedaron en Supabase.');
+  };
+}
 function renderAdminProducts(){
   const wrap = document.getElementById('adminContent');
   wrap.innerHTML = `
@@ -1941,6 +2017,7 @@ function renderAdminProducts(){
       </table>
     </div>
   `;
+  renderImageMigrationBanner();
   document.getElementById('newProductBtn').onclick = ()=>renderProductForm(null);
   document.getElementById('downloadTemplateBtn').onclick = downloadCsvTemplate;
   document.getElementById('csvManualLink').onclick = (e)=>{ e.preventDefault(); showCsvTemplateManually(); };
@@ -1970,11 +2047,14 @@ function renderAdminProducts(){
     btn.style.padding = '0 8px';
     btn.classList.add('danger-solid');
     const confirmHandler = async ()=>{
-      products = products.filter(p=>p.id!==Number(btn.dataset.del));
-      await saveProducts();
+      const delId = Number(btn.dataset.del);
+      const ok = await updateProducts(list=>{
+        const idx = list.findIndex(p=>p.id===delId);
+        if(idx >= 0) list.splice(idx, 1);
+      });
       renderAdminProducts();
       renderGrid();
-      showToast('Producto eliminado');
+      if(ok) showToast('Producto eliminado');
     };
     btn.onclick = confirmHandler;
     setTimeout(()=>{
@@ -2094,6 +2174,10 @@ function handleCsvImport(ev){
       showToast('Faltan columnas obligatorias (nombre, categoria, precio)');
       return;
     }
+    try{
+      const latest = await window.storage.get('products', true);
+      if(latest) products = JSON.parse(latest.value);
+    }catch(e){}
     let added = 0, skipped = 0;
     let nextId = products.length ? Math.max(...products.map(x=>x.id)) : 0;
     for(let i=1; i<rows.length; i++){
@@ -2133,7 +2217,7 @@ function handleCsvImport(ev){
 }
 
 const MAX_PRODUCT_IMAGES = 6;
-function compressImage(file, maxSide = 1200, quality = 0.82){
+function compressImage(file, maxSide = 1600, quality = 0.85){
   return new Promise((resolve, reject)=>{
     const reader = new FileReader();
     reader.onerror = reject;
@@ -2197,6 +2281,7 @@ function renderProductForm(id){
     </div>
   `;
   let productImgs = p ? productImages(p).slice() : [];
+  let uploadingImgs = 0;
   function updatePreview(){
     const wrapEl = document.getElementById('imagePreviewWrap');
     if(productImgs.length){
@@ -2270,17 +2355,25 @@ function renderProductForm(id){
     const free = MAX_PRODUCT_IMAGES - productImgs.length;
     if(free <= 0){ showToast(`Máximo ${MAX_PRODUCT_IMAGES} fotos por producto`); return; }
     if(files.length > free) showToast(`Solo se agregaron ${free} foto${free!==1?'s':''} (máximo ${MAX_PRODUCT_IMAGES})`);
+    uploadingImgs++;
+    const wrapEl = document.getElementById('imagePreviewWrap');
     for(const file of files.slice(0, free)){
       if(!file.type.startsWith('image/')) continue;
-      if(file.size > 10*1024*1024){ showToast(`"${file.name}" es muy pesada (máx. 10MB)`); continue; }
-      try{ productImgs.push(await compressImage(file)); }
-      catch(e){ showToast(`No se pudo leer "${file.name}"`); }
+      if(file.size > 25*1024*1024){ showToast(`"${file.name}" es muy pesada (máx. 25MB)`); continue; }
+      if(wrapEl) wrapEl.insertAdjacentHTML('beforeend', `<div class="upload-note" style="font-size:12px;color:var(--text-soft);margin-top:6px;">Subiendo "${file.name}"…</div>`);
+      let dataUrl;
+      try{ dataUrl = await compressImage(file); }
+      catch(e){ showToast(`No se pudo leer "${file.name}"`); continue; }
+      try{ productImgs.push(await uploadImage(dataUrl)); }
+      catch(e){ showToast(`No se pudo subir "${file.name}": ${e.message}`); }
     }
+    uploadingImgs--;
     updatePreview();
   };
   document.getElementById('cancelForm').onclick = ()=>wrap.innerHTML='';
   document.getElementById('productForm').onsubmit = async(e)=>{
     e.preventDefault();
+    if(uploadingImgs > 0){ showToast('Esperá a que terminen de subir las fotos'); return; }
     const selectedSizes = Array.from(document.querySelectorAll('#sizeCheckboxRow input:checked')).map(i=>i.value);
     readSizePriceInputs();
     const sizePrices = {};
@@ -2310,6 +2403,16 @@ function renderProductForm(id){
       }
       generalPrice = Math.min(...selectedSizes.map(s=>sizePrices[s]));
     }
+    // Si el producto todavía tenía fotos guardadas al estilo viejo, se suben ahora.
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if(submitBtn){ submitBtn.disabled = true; submitBtn.textContent = 'Guardando…'; }
+    try{
+      productImgs = await Promise.all(productImgs.map(src => isDataUrl(src) ? uploadImage(src) : src));
+    }catch(err){
+      showToast('No se pudieron subir las fotos: ' + err.message);
+      if(submitBtn){ submitBtn.disabled = false; submitBtn.textContent = 'Guardar'; }
+      return;
+    }
     const data = {
       name: fd.get('name'),
       type: fd.get('type'),
@@ -2323,13 +2426,20 @@ function renderProductForm(id){
       image: productImgs[0] || null,
       color: p ? p.color : ['sage','blush','sky','honey'][Math.floor(Math.random()*4)]
     };
-    if(p){
-      Object.assign(p, data);
-    } else {
-      const newId = products.length ? Math.max(...products.map(x=>x.id))+1 : 1;
-      products.push({id:newId, ...data});
+    const editId = p ? p.id : null;
+    const ok = await updateProducts(list=>{
+      const cur = editId !== null ? list.find(x=>x.id===editId) : null;
+      if(cur){
+        Object.assign(cur, data);
+      } else {
+        const newId = list.length ? Math.max(...list.map(x=>x.id))+1 : 1;
+        list.push({id:newId, ...data});
+      }
+    });
+    if(!ok){
+      if(submitBtn){ submitBtn.disabled = false; submitBtn.textContent = 'Guardar'; }
+      return; // el formulario queda abierto para reintentar
     }
-    await saveProducts();
     wrap.innerHTML='';
     renderAdminProducts();
     renderGrid();
