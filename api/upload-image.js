@@ -9,7 +9,9 @@ export default async function handler(req, res) {
   }
 
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+    || process.env.SUPABASE_SECRET_KEY
+    || process.env.SUPABASE_SERVICE_KEY;
   if (!SUPABASE_URL || !KEY) {
     // Diagnóstico: muestra solo los NOMBRES de las variables que ve la función, nunca los valores.
     return res.status(500).json({
@@ -39,7 +41,11 @@ export default async function handler(req, res) {
   }
 
   const base = SUPABASE_URL.replace(/\/$/, '');
-  const auth = { Authorization: `Bearer ${KEY}`, apikey: KEY };
+  // Las claves nuevas de Supabase (sb_secret_...) van solo en "apikey";
+  // las clásicas (eyJ...) van también como Bearer.
+  const auth = KEY.startsWith('sb_')
+    ? { apikey: KEY }
+    : { Authorization: `Bearer ${KEY}`, apikey: KEY };
   const path = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
 
   const upload = () => fetch(`${base}/storage/v1/object/${BUCKET}/${path}`, {
