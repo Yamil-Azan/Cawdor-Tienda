@@ -809,6 +809,10 @@
     </div>
     <div class="filters" style="margin-top:-4px;">
       <div>
+        <div class="eyebrow" style="margin-bottom:8px;">Edad</div>
+        <div class="chip-row" id="ageChips"></div>
+      </div>
+      <div>
         <div class="eyebrow" style="margin-bottom:8px;">Categoría</div>
         <div class="chip-row" id="typeChips"></div>
       </div>
@@ -947,7 +951,26 @@ const TYPE_LABELS = {
   combo:'Combos', ajuar:'Ajuares'
 };
 const TYPE_ORDER = ['body','conjunto','pantalon','remera','accesorio','media','nidito','combo','ajuar'];
-const SIZE_OPTIONS = ['RN','0-3M','3-6M','6-9M','9-12M','6-12M','12-18M','18-24M','24-36M','Única'];
+const BABY_SIZE_OPTIONS = ['RN','0-3M','3-6M','6-9M','9-12M','6-12M','12-18M','18-24M','24-36M'];
+// Talles de niños (ropa para chicos de 2 a 6 años)
+const KIDS_SIZE_OPTIONS = ['2','3','4','5','6'];
+const SIZE_OPTIONS = [...BABY_SIZE_OPTIONS, ...KIDS_SIZE_OPTIONS, 'Única'];
+const isKidsSize = size => KIDS_SIZE_OPTIONS.includes(String(size||'').trim());
+const isBabySize = size => BABY_SIZE_OPTIONS.includes(String(size||'').trim());
+// Grupo de edad de un producto: 'ninos' si tiene algún talle 2 a 6, 'bebes' si tiene talles de bebé.
+// Los productos de talle Única o medidas en ml se consideran de bebé.
+function productAgeGroups(p){
+  const sizes = p.sizes || [];
+  const groups = new Set();
+  if(sizes.some(isKidsSize)) groups.add('ninos');
+  if(sizes.some(isBabySize) || !sizes.some(isKidsSize)) groups.add('bebes');
+  return groups;
+}
+const AGE_FILTERS = [
+  {value:'all', label:'Todas'},
+  {value:'bebes', label:'👶 Bebés (RN a 36M)'},
+  {value:'ninos', label:'🧒 Niños (talles 2 a 6)'}
+];
 // Medidas en ml: solo se ofrecen para la categoría Accesorios (mamaderas, vasitos, etc.)
 const ACCESSORY_SIZE_OPTIONS = ['60 ml','120 ml','150 ml','180 ml','250 ml','270 ml','330 ml'];
 function sizeOptionsFor(type){
@@ -1014,7 +1037,7 @@ let products = [];
 let cart = [];
 let confirmingClear = false;
 let orders = [];
-let filters = {type:'all', search:'', sort:'relevancia', onlyOffers:false};
+let filters = {type:'all', age:'all', search:'', sort:'relevancia', onlyOffers:false};
 let currentProduct = null;
 let selectedSize = null;
 let modalQty = 1;
@@ -1180,6 +1203,12 @@ function renderFilters(){
 
   typeWrap.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{filters.type=b.dataset.type; renderFilters(); renderGrid();});
 
+  const ageWrap = document.getElementById('ageChips');
+  if(ageWrap){
+    ageWrap.innerHTML = AGE_FILTERS.map(a=>`<button class="chip ${filters.age===a.value?'active':''}" data-age="${a.value}">${a.label}</button>`).join('');
+    ageWrap.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{filters.age=b.dataset.age; renderFilters(); renderGrid();});
+  }
+
   const offersChip = document.getElementById('offersChip');
   if(filters.onlyOffers){
     offersChip.classList.add('active');
@@ -1197,6 +1226,7 @@ function isOnOffer(p){ return !!(p.originalPrice && p.originalPrice > p.price); 
 function filteredProducts(){
   let list = products.filter(p=>{
     if(filters.type!=='all' && p.type!==filters.type) return false;
+    if(filters.age!=='all' && !productAgeGroups(p).has(filters.age)) return false;
     if(filters.onlyOffers && !isOnOffer(p)) return false;
     if(filters.search && !p.name.toLowerCase().includes(filters.search.toLowerCase())) return false;
     return true;
