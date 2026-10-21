@@ -960,11 +960,11 @@
 };
 const money = n => '$' + Number(n).toLocaleString('es-AR');
 const TYPE_LABELS = {
-  body:'Bodys', conjunto:'Conjuntos', pantalon:'Pantalones', remera:'Remeras',
+  body:'Bodys', enterito:'Enteritos', conjunto:'Conjuntos', pantalon:'Pantalones', jean:'Jeans', remera:'Remeras',
   accesorio:'Accesorios', media:'Medias', nidito:'Niditos y almohadones de amamantar',
   combo:'Combos', ajuar:'Ajuares'
 };
-const TYPE_ORDER = ['body','conjunto','pantalon','remera','accesorio','media','nidito','combo','ajuar'];
+const TYPE_ORDER = ['body','enterito','conjunto','pantalon','jean','remera','accesorio','media','nidito','combo','ajuar'];
 const BABY_SIZE_OPTIONS = ['RN','0','1','0-3M','3-6M','6-9M','9-12M','6-12M','12-18M','18-24M','24-36M'];
 // Talles de niños (ropa para chicos de 2 a 6 años)
 const KIDS_SIZE_OPTIONS = ['2','3','4','5','6'];
@@ -1118,6 +1118,8 @@ function iconFor(type,color){
   const c = {sage:'#4EA97D',blush:'#E7B6B0',sky:'#A8C5D6',honey:'#E4B84A'}[color] || '#4EA97D';
   const shapes = {
     body:`<path d="M35 20 L65 20 L70 34 L60 40 L60 82 Q50 90 40 82 L40 40 L30 34 Z" fill="${c}" opacity="0.85"/><circle cx="50" cy="26" r="7" fill="${c}"/>`,
+    enterito:`<path d="M36 16 L64 16 L72 30 L62 36 L62 60 L60 86 L52 86 L50 66 L48 86 L40 86 L38 60 L38 36 L28 30 Z" fill="${c}" opacity="0.85"/><circle cx="45" cy="42" r="2.2" fill="#fff" opacity="0.8"/><circle cx="55" cy="42" r="2.2" fill="#fff" opacity="0.8"/>`,
+    jean:`<path d="M34 18 h32 v14 l-4 50 q-1 8 -8 8 t-8 -8 l-2 -30 h-4 l-2 30 q-1 8 -8 8 t-8 -8 z" fill="#5B7FA8" opacity="0.9"/><rect x="34" y="14" width="32" height="8" rx="3" fill="#47678C"/><path d="M38 24 q4 8 10 8 M62 24 q-4 8 -10 8" stroke="#E4B84A" stroke-width="1.6" fill="none"/>`,
     conjunto:`<path d="M30 18 L70 18 L74 34 L62 38 L62 52 L38 52 L38 38 L26 34 Z" fill="${c}" opacity="0.9"/><rect x="36" y="54" width="28" height="34" rx="8" fill="${c}" opacity="0.6"/>`,
     pantalon:`<path d="M34 18 h32 v14 l-4 50 q-1 8 -8 8 t-8 -8 l-2 -30 h-4 l-2 30 q-1 8 -8 8 t-8 -8 z" fill="${c}" opacity="0.85"/><rect x="34" y="14" width="32" height="8" rx="3" fill="${c}"/>`,
     remera:`<path d="M32 20 L44 14 L50 20 L56 14 L68 20 L74 34 L64 40 L64 84 L36 84 L36 40 L26 34 Z" fill="${c}" opacity="0.85"/>`,
@@ -2269,7 +2271,7 @@ function showCsvTemplateManually(){
   const csv = header + example;
   const win = window.open('', '_blank');
   if(win){
-    win.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">${csv.replace(/</g,'&lt;')}</pre><p style="font-family:sans-serif;color:#555;padding:0 20px;">Seleccioná todo este texto (Ctrl/Cmd+A), copialo, y pegalo en un archivo nuevo llamado <b>plantilla_productos_cawdor.csv</b> desde el Bloc de notas, Excel o Google Sheets.<br><br>Categorías válidas: body, conjunto, pantalon, remera, accesorio, media, nidito, combo, ajuar.<br>"precio_anterior" es opcional: completalo solo si el producto está en oferta.<br>"precio_mayorista" es opcional: es el precio por unidad cuando el cliente lleva ${WHOLESALE_MIN_QTY} o más.</p>`);
+    win.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">${csv.replace(/</g,'&lt;')}</pre><p style="font-family:sans-serif;color:#555;padding:0 20px;">Seleccioná todo este texto (Ctrl/Cmd+A), copialo, y pegalo en un archivo nuevo llamado <b>plantilla_productos_cawdor.csv</b> desde el Bloc de notas, Excel o Google Sheets.<br><br>Categorías válidas: body, enterito, conjunto, pantalon, jean, remera, accesorio, media, nidito, combo, ajuar.<br>"precio_anterior" es opcional: completalo solo si el producto está en oferta.<br>"precio_mayorista" es opcional: es el precio por unidad cuando el cliente lleva ${WHOLESALE_MIN_QTY} o más.</p>`);
   } else {
     showToast('Tu navegador bloqueó la ventana emergente. Habilitala e intentá de nuevo.');
   }
@@ -2321,6 +2323,8 @@ const TYPE_ALIASES = {
   body:'body', bodys:'body', bodies:'body',
   conjunto:'conjunto', conjuntos:'conjunto',
   pantalon:'pantalon', pantalón:'pantalon', pantalones:'pantalon',
+  jean:'jean', jeans:'jean', jeanes:'jean',
+  enterito:'enterito', enteritos:'enterito',
   remera:'remera', remeras:'remera',
   accesorio:'accesorio', accesorios:'accesorio',
   media:'media', medias:'media',
