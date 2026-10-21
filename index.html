@@ -314,6 +314,19 @@
   }
   .price-wrap{display:flex;flex-direction:column;line-height:1.2;}
   .price-old{font-size:11.5px;color:var(--text-soft);text-decoration:line-through;font-weight:600;}
+  /* precio mayorista */
+  .price-wholesale{
+    display:inline-flex;align-items:center;gap:5px;align-self:flex-start;
+    font-size:11.5px;font-weight:700;color:#3E6C86;background:var(--sky-tint);
+    padding:3px 9px;border-radius:100px;margin-top:3px;line-height:1.3;
+  }
+  .price-wholesale.on{background:var(--sage-tint);color:var(--sage-dark);}
+  html[data-theme="dark"] .price-wholesale{background:rgba(168,197,214,0.16);color:#A8C5D6;}
+  html[data-theme="dark"] .price-wholesale.on{background:rgba(78,169,125,0.18);color:#7FD0A6;}
+  .wholesale-hint{font-size:11.5px;color:#3E6C86;font-weight:600;margin-top:6px;}
+  html[data-theme="dark"] .wholesale-hint{color:#A8C5D6;}
+  .wholesale-tag{font-size:10px;font-weight:800;color:var(--sage-dark);background:var(--sage-tint);padding:1px 6px;border-radius:6px;margin-left:4px;}
+  .savings-row{display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:var(--sage-dark);margin:-6px 0 12px;}
   .empty-state{
     text-align:center;padding:60px 20px;color:var(--text-soft);
     border:1px dashed var(--border);border-radius:var(--radius);
@@ -957,6 +970,27 @@ function minPrice(p){ const l = sizePriceList(p); return l.length ? Math.min(...
 function hasVariablePrice(p){ return new Set(sizePriceList(p)).size > 1; }
 // la oferta (precio tachado) solo aplica a las medidas que usan el precio general
 function showsOffer(p, size){ return !!(p.originalPrice && p.originalPrice > priceFor(p, size)) && !(p.sizePrices && p.sizePrices[size]); }
+// ---------- PRECIO MAYORISTA ----------
+// Un producto puede tener (opcional) un precio mayorista. Se aplica cuando en el carrito
+// hay WHOLESALE_MIN_QTY unidades o más de ESE producto, sumando todos sus talles/medidas.
+const WHOLESALE_MIN_QTY = 3;
+function hasWholesale(p){ return !!(p && Number(p.wholesalePrice) > 0); }
+// nunca puede quedar más caro que el precio minorista de ese talle
+function wholesaleFor(p, size){ return Math.min(Number(p.wholesalePrice), priceFor(p, size)); }
+function productQtyInCart(productId){
+  return cart.filter(i=>i.productId===productId).reduce((sum,i)=>sum+i.qty, 0);
+}
+function isWholesaleApplied(p, totalQty){ return hasWholesale(p) && totalQty >= WHOLESALE_MIN_QTY; }
+// precio unitario real según cuántas unidades del producto se llevan en total
+function unitPrice(p, size, totalQty){ return isWholesaleApplied(p, totalQty) ? wholesaleFor(p, size) : priceFor(p, size); }
+function cartUnitPrice(p, size){ return unitPrice(p, size, productQtyInCart(p.id)); }
+function wholesaleBadgeHtml(p, size, applied){
+  if(!hasWholesale(p)) return '';
+  const value = size != null ? wholesaleFor(p, size) : Number(p.wholesalePrice);
+  return applied
+    ? `<span class="price-wholesale on">✓ Precio mayorista: ${money(value)} c/u</span>`
+    : `<span class="price-wholesale">Mayorista ${money(value)} c/u · desde ${WHOLESALE_MIN_QTY} u.</span>`;
+}
 const GOCUOTAS_INSTALLMENTS = 3;
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('trustGocuotasInstallments');
@@ -1207,6 +1241,7 @@ function renderGrid(){
         <div class="price-block">
           ${!variable && showsOffer(p, p.sizes[0]) ? `<span class="price-old">${money(p.originalPrice)}</span>` : ''}
           <span class="price">${variable ? 'Desde ' + money(minPrice(p)) : money(priceFor(p, p.sizes[0]))}</span>
+          ${wholesaleBadgeHtml(p, variable ? null : p.sizes[0], isWholesaleApplied(p, productQtyInCart(p.id)))}
         </div>
         <div class="card-bottom">
           ${controls}
@@ -1297,6 +1332,17 @@ function renderProductModal(){
       <div class="price-block" style="margin-top:6px;">
         ${showsOffer(p, selectedSize) ? `<span class="price-old" style="font-size:13px;">${money(p.originalPrice)}</span>` : ''}
         <span class="price" style="font-size:20px;">${money(priceFor(p, selectedSize))}</span>
+        ${(()=>{
+          if(!hasWholesale(p)) return '';
+          const inCart = productQtyInCart(p.id);
+          const total = inCart + modalQty;
+          const applied = isWholesaleApplied(p, total);
+          const missing = WHOLESALE_MIN_QTY - total;
+          return wholesaleBadgeHtml(p, selectedSize, applied) +
+            (applied
+              ? `<span class="wholesale-hint">Llevando ${total} unidades pagás ${money(wholesaleFor(p, selectedSize))} cada una.</span>`
+              : `<span class="wholesale-hint">Sumá ${missing} unidad${missing!==1?'es':''} más (cualquier talle) para el precio mayorista${inCart?` · ya tenés ${inCart} en el carrito`:''}.</span>`);
+        })()}
       </div>
       <p class="pm-desc">${p.desc}</p>
       <div class="eyebrow">${p.sizes.every(isVolumeSize) ? 'Medida' : 'Talle'}</div>
@@ -1354,7 +1400,21 @@ function renderDrawer(){
       <div class="cart-item-media">${mediaFor(p)}</div>
       <div class="cart-item-info">
         <div class="name">${p.name}</div>
-        <div class="meta">${sizeLabel(item.size)} ${item.size} · ${money(priceFor(p, item.size))}</div>
+        <div class="meta">${sizeLabel(item.size)} ${item.size} · ${(()=>{
+          const qtyAll = productQtyInCart(p.id);
+          if(isWholesaleApplied(p, qtyAll)){
+            return `<span class="price-old">${money(priceFor(p, item.size))}</span> ${money(cartUnitPrice(p, item.size))}<span class="wholesale-tag">MAYORISTA</span>`;
+          }
+          return money(priceFor(p, item.size));
+        })()}</div>
+        ${(()=>{
+          // el aviso se muestra una sola vez por producto (en su primer renglón)
+          if(!hasWholesale(p) || cart.findIndex(i=>i.productId===p.id) !== idx) return '';
+          const missing = WHOLESALE_MIN_QTY - productQtyInCart(p.id);
+          return missing > 0
+            ? `<div class="wholesale-hint" style="margin:0 0 6px;">Sumá ${missing} más de este producto y pagás ${money(Number(p.wholesalePrice))} c/u</div>`
+            : '';
+        })()}
         <div class="cart-item-row">
           <div class="qty-control">
             <button data-dec="${idx}">−</button><span>${item.qty}</span><button data-inc="${idx}">+</button>
@@ -1375,6 +1435,7 @@ function renderDrawer(){
     </div>
   ` : `
     <div class="subtotal-row"><span>Subtotal</span><span>${money(total)}</span></div>
+    ${wholesaleSavings() > 0 ? `<div class="savings-row"><span>Ahorro por precio mayorista</span><span>−${money(wholesaleSavings())}</span></div>` : ''}
     <button class="btn btn-sage" style="width:100%;justify-content:center;" id="goCheckout">Ir a pagar</button>
     <button class="clear-cart-link" id="clearCart">Vaciar carrito</button>
   `;
@@ -1407,7 +1468,14 @@ function renderDrawer(){
 function cartTotal(){
   return cart.reduce((sum,item)=>{
     const p = products.find(x=>x.id===item.productId);
-    return sum + (p? priceFor(p, item.size)*item.qty : 0);
+    return sum + (p? cartUnitPrice(p, item.size)*item.qty : 0);
+  },0);
+}
+// cuánto se ahorra el cliente gracias a los precios mayoristas
+function wholesaleSavings(){
+  return cart.reduce((sum,item)=>{
+    const p = products.find(x=>x.id===item.productId);
+    return sum + (p? (priceFor(p, item.size) - cartUnitPrice(p, item.size))*item.qty : 0);
   },0);
 }
 document.getElementById('cartBtn').onclick = ()=>{ renderDrawer(); document.getElementById('cartDrawer').classList.add('open'); document.getElementById('drawerOverlay').classList.add('open'); };
@@ -1620,7 +1688,7 @@ function buildOrderWhatsappMessage(order){
     `Forma de pago: ${payText}`,
     '',
     'Prendas:',
-    ...order.items.map(i=>`• ${i.qty}× ${i.name} (${sizeLabel(i.size).toLowerCase()} ${i.size}) — ${money(i.price*i.qty)}`),
+    ...order.items.map(i=>`• ${i.qty}× ${i.name} (${sizeLabel(i.size).toLowerCase()} ${i.size})${i.wholesale?' [precio mayorista]':''} — ${money(i.price*i.qty)}`),
     '',
     `Total: ${money(order.total)}`,
     '',
@@ -1789,7 +1857,8 @@ async function handleCheckoutSubmit(e){
     notes: notes,
     items: cart.map(i=>{
       const p = products.find(x=>x.id===i.productId);
-      return {productId:i.productId, name:p?p.name:'', size:i.size, qty:i.qty, price:p?priceFor(p, i.size):0};
+      const wholesale = p ? isWholesaleApplied(p, productQtyInCart(p.id)) : false;
+      return {productId:i.productId, name:p?p.name:'', size:i.size, qty:i.qty, price:p?cartUnitPrice(p, i.size):0, wholesale};
     }),
     total: getOrderTotal(),
     cardInstallments: payMethod === 'tarjeta' ? CARD_PLANS[selectedCardPlanIndex].cuotas : null,
@@ -2031,7 +2100,7 @@ function renderAdminProducts(){
         <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;">${p.name}</div>
         <div style="font-size:10.5px;color:var(--text-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${TYPE_LABELS[p.type]}</div>
       </td>
-      <td style="font-weight:700;white-space:nowrap;">${hasVariablePrice(p) ? '<span style="font-size:10px;font-weight:600;color:var(--text-soft);display:block;">desde</span>' + money(minPrice(p)) : money(p.price)}</td>
+      <td style="font-weight:700;white-space:nowrap;">${hasVariablePrice(p) ? '<span style="font-size:10px;font-weight:600;color:var(--text-soft);display:block;">desde</span>' + money(minPrice(p)) : money(p.price)}${hasWholesale(p) ? `<span style="font-size:10.5px;font-weight:700;color:#3E6C86;display:block;">May. ${money(p.wholesalePrice)}</span>` : ''}</td>
       <td>${p.stock}</td>
       <td style="display:flex;gap:4px;">
         <button class="icon-action-btn" data-edit="${p.id}" title="Editar" aria-label="Editar">✎</button>
@@ -2065,8 +2134,8 @@ function renderAdminProducts(){
   });
 }
 function downloadCsvTemplate(){
-  const header = 'nombre,categoria,precio,precio_anterior,stock,talles,descripcion\n';
-  const example = 'Ajuar,ajuar,12500,,20,"0-1","Algodón pima. 3 piezas"\n';
+  const header = 'nombre,categoria,precio,precio_anterior,precio_mayorista,stock,talles,descripcion\n';
+  const example = 'Ajuar,ajuar,12500,,10500,20,"0-1","Algodón pima. 3 piezas"\n';
   const csv = header + example;
 
   try{
@@ -2084,12 +2153,12 @@ function downloadCsvTemplate(){
 }
 
 function showCsvTemplateManually(){
-  const header = 'nombre,categoria,precio,precio_anterior,stock,talles,descripcion\n';
-  const example = 'Ajuar,ajuar,12500,,20,"0-1","Algodón pima. 3 piezas"\n';
+  const header = 'nombre,categoria,precio,precio_anterior,precio_mayorista,stock,talles,descripcion\n';
+  const example = 'Ajuar,ajuar,12500,,10500,20,"0-1","Algodón pima. 3 piezas"\n';
   const csv = header + example;
   const win = window.open('', '_blank');
   if(win){
-    win.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">${csv.replace(/</g,'&lt;')}</pre><p style="font-family:sans-serif;color:#555;padding:0 20px;">Seleccioná todo este texto (Ctrl/Cmd+A), copialo, y pegalo en un archivo nuevo llamado <b>plantilla_productos_cawdor.csv</b> desde el Bloc de notas, Excel o Google Sheets.<br><br>Categorías válidas: body, conjunto, pantalon, remera, accesorio, media, nidito, combo, ajuar.<br>"precio_anterior" es opcional: completalo solo si el producto está en oferta.</p>`);
+    win.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">${csv.replace(/</g,'&lt;')}</pre><p style="font-family:sans-serif;color:#555;padding:0 20px;">Seleccioná todo este texto (Ctrl/Cmd+A), copialo, y pegalo en un archivo nuevo llamado <b>plantilla_productos_cawdor.csv</b> desde el Bloc de notas, Excel o Google Sheets.<br><br>Categorías válidas: body, conjunto, pantalon, remera, accesorio, media, nidito, combo, ajuar.<br>"precio_anterior" es opcional: completalo solo si el producto está en oferta.<br>"precio_mayorista" es opcional: es el precio por unidad cuando el cliente lleva ${WHOLESALE_MIN_QTY} o más.</p>`);
   } else {
     showToast('Tu navegador bloqueó la ventana emergente. Habilitala e intentá de nuevo.');
   }
@@ -2166,6 +2235,7 @@ function handleCsvImport(ev){
       type: headerRow.indexOf('categoria') !== -1 ? headerRow.indexOf('categoria') : headerRow.indexOf('tipo'),
       price: headerRow.indexOf('precio'),
       originalPrice: headerRow.indexOf('precioanterior'),
+      wholesalePrice: headerRow.indexOf('preciomayorista'),
       stock: headerRow.indexOf('stock'),
       sizes: headerRow.indexOf('talles'),
       desc: headerRow.indexOf('descripcion')
@@ -2186,6 +2256,7 @@ function handleCsvImport(ev){
       const typeRaw = (r[idx.type]||'').trim().toLowerCase().replace(/\s+/g,'');
       const price = parseNumberAR(r[idx.price]);
       const originalPriceRaw = idx.originalPrice!==-1 ? parseNumberAR(r[idx.originalPrice]) : NaN;
+      const wholesaleRaw = idx.wholesalePrice!==-1 ? parseNumberAR(r[idx.wholesalePrice]) : NaN;
       const stock = idx.stock!==-1 ? parseNumberAR(r[idx.stock]||'0') : 0;
       const sizes = idx.sizes!==-1 && r[idx.sizes] ? r[idx.sizes].split('|').map(s=>s.trim()).filter(Boolean) : ['Única'];
       const desc = idx.desc!==-1 ? (r[idx.desc]||'') : '';
@@ -2198,6 +2269,7 @@ function handleCsvImport(ev){
       products.push({
         id: nextId, name, type, price,
         originalPrice: Number.isFinite(originalPriceRaw) && originalPriceRaw > price ? originalPriceRaw : null,
+        wholesalePrice: Number.isFinite(wholesaleRaw) && wholesaleRaw > 0 && wholesaleRaw < price ? wholesaleRaw : null,
         stock: Number.isFinite(stock)?stock:0,
         sizes: sizes.length?sizes:['Única'], desc,
         image: null, color: ['sage','blush','sky','honey'][Math.floor(Math.random()*4)]
@@ -2254,6 +2326,7 @@ function renderProductForm(id){
           </div>
           <div class="field"><label>Precio general (ARS)</label><input type="number" min="0" name="price" value="${p?p.price:''}" placeholder="Opcional si cada medida tiene su precio"><span style="font-size:11px;color:var(--text-soft);display:block;margin-top:4px;">Se usa para los talles o medidas sin precio propio.</span><span id="priceError" class="field-error-msg"></span></div>
           <div class="field"><label>Precio anterior (opcional, para oferta)</label><input type="number" min="0" name="originalPrice" value="${p&&p.originalPrice?p.originalPrice:''}" placeholder="Dejar vacío si no hay oferta"></div>
+          <div class="field"><label>Precio mayorista (opcional)</label><input type="number" min="0" name="wholesalePrice" value="${p&&p.wholesalePrice?p.wholesalePrice:''}" placeholder="Dejar vacío si no tiene"><span style="font-size:11px;color:var(--text-soft);display:block;margin-top:4px;">Precio por unidad cuando el cliente lleva ${WHOLESALE_MIN_QTY} o más de este producto (sumando talles).</span><span id="wholesaleError" class="field-error-msg"></span></div>
           <div class="field"><label>Stock</label><input required type="number" min="0" name="stock" value="${p?p.stock:''}"></div>
           <div class="field full">
             <label>Talles o medidas disponibles</label>
@@ -2347,6 +2420,7 @@ function renderProductForm(id){
   }
   document.querySelector('#productForm select[name="type"]').addEventListener('change', renderSizeCheckboxes);
   document.querySelector('#productForm input[name="price"]').addEventListener('input', ()=>document.getElementById('priceError').classList.remove('show'));
+  document.querySelector('#productForm input[name="wholesalePrice"]').addEventListener('input', ()=>document.getElementById('wholesaleError').classList.remove('show'));
   renderSizeCheckboxes();
   document.getElementById('productImageInput').onchange = async (ev)=>{
     const files = Array.from(ev.target.files || []);
@@ -2403,6 +2477,15 @@ function renderProductForm(id){
       }
       generalPrice = Math.min(...selectedSizes.map(s=>sizePrices[s]));
     }
+    const wholesaleRaw = Number(fd.get('wholesalePrice'));
+    const wholesalePrice = wholesaleRaw > 0 ? wholesaleRaw : null;
+    if(wholesalePrice && wholesalePrice >= generalPrice){
+      const err = document.getElementById('wholesaleError');
+      err.textContent = `El precio mayorista tiene que ser menor al minorista (${money(generalPrice)})`;
+      err.classList.add('show');
+      e.target.querySelector('input[name="wholesalePrice"]').focus();
+      return;
+    }
     // Si el producto todavía tenía fotos guardadas al estilo viejo, se suben ahora.
     const submitBtn = e.target.querySelector('button[type="submit"]');
     if(submitBtn){ submitBtn.disabled = true; submitBtn.textContent = 'Guardando…'; }
@@ -2418,6 +2501,7 @@ function renderProductForm(id){
       type: fd.get('type'),
       price: generalPrice,
       originalPrice: originalPriceRaw ? Number(originalPriceRaw) : null,
+      wholesalePrice,
       stock: Number(fd.get('stock')),
       sizes: selectedSizes,
       sizePrices: Object.keys(sizePrices).length ? sizePrices : null,
