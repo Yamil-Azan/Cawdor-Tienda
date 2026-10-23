@@ -1320,7 +1320,7 @@ function renderGrid(){
       <div class="card-body">
         <div class="card-title" data-open="${p.id}">${p.name}</div>
         ${p.stock===0?'<span class="stock-low">Sin stock</span>':''}
-        ${hasColors(p) && p.stock>0 ? `<div class="card-colors">${p.colors.filter(c=>colorStock(p,c)>0).map(c=>`<span>${colorDot(c)}${c}</span>`).join('')}</div>` : ''}
+        ${hasColors(p) && p.stock>0 ? `<div class="card-colors">${p.colors.filter(c=>colorStock(p,c)>0).map(c=>`<span>${c}</span>`).join('')}</div>` : ''}
         <div class="price-block">
           ${!priceVaries && showsOffer(p, p.sizes[0]) ? `<span class="price-old">${money(p.originalPrice)}</span>` : ''}
           <span class="price">${priceVaries ? 'Desde ' + money(minPrice(p)) : money(priceFor(p, p.sizes[0]))}</span>
@@ -1441,7 +1441,7 @@ function renderProductModal(){
       </div>
       <p class="pm-desc" style="white-space:pre-line;">${p.desc}</p>
       ${colored ? `<div class="eyebrow">Color</div>
-      <div class="size-row" id="colorRow">${p.colors.map(c=>{ const out = colorStock(p,c)===0; return `<button class="size-btn color-btn ${c===selectedColor?'active':''}" data-color="${c}" ${out?'disabled title="Sin stock"':''}>${colorDot(c)}${c}</button>`; }).join('')}</div>` : ''}
+      <div class="size-row" id="colorRow">${p.colors.map(c=>{ const out = colorStock(p,c)===0; return `<button class="size-btn color-btn ${c===selectedColor?'active':''}" data-color="${c}" ${out?'disabled title="Sin stock"':''}>${c}</button>`; }).join('')}</div>` : ''}
       <div class="eyebrow">${p.sizes.every(isVolumeSize) ? 'Medida' : 'Talle'}</div>
       <div class="size-row" id="sizeRow">${p.sizes.map(s=>{ const out = colored && variantStock(p,s,selectedColor)===0; return `<button class="size-btn ${s===selectedSize?'active':''}" data-size="${s}" ${out?'disabled title="No hay en este color"':''}>${s}</button>`; }).join('')}</div>
       <div class="eyebrow">Cantidad</div>
