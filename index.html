@@ -2221,7 +2221,10 @@ function renderAdminProducts(){
       </td>
     </tr>
   `).join('');
-  body.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>renderProductForm(Number(b.dataset.edit)));
+  body.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{
+    renderProductForm(Number(b.dataset.edit));
+    scrollToProductForm();
+  });
   body.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
     const btn = b;
     btn.textContent = '¿Sí?';
@@ -2426,6 +2429,17 @@ function compressImage(file, maxSide = 1600, quality = 0.85){
     };
     reader.readAsDataURL(file);
   });
+}
+// Lleva la pantalla hasta el formulario de edición, dejando lugar para el encabezado fijo.
+function scrollToProductForm(){
+  const wrap = document.getElementById('productFormWrap');
+  if(!wrap) return;
+  const header = document.querySelector('.sticky-top-wrap');
+  const offset = (header ? header.offsetHeight : 0) + 12;
+  const top = wrap.getBoundingClientRect().top + window.scrollY - offset;
+  window.scrollTo({top: Math.max(0, top), behavior:'smooth'});
+  const firstField = wrap.querySelector('input[name="name"]');
+  if(firstField) setTimeout(()=>firstField.focus({preventScroll:true}), 400);
 }
 function renderProductForm(id){
   const p = id ? products.find(x=>x.id===id) : null;
