@@ -1439,7 +1439,7 @@ function renderProductModal(){
               : `<span class="wholesale-hint">Sumá ${missing} unidad${missing!==1?'es':''} más (cualquier talle) para el precio mayorista${inCart?` · ya tenés ${inCart} en el carrito`:''}.</span>`);
         })()}
       </div>
-      <p class="pm-desc">${p.desc}</p>
+      <p class="pm-desc" style="white-space:pre-line;">${p.desc}</p>
       ${colored ? `<div class="eyebrow">Color</div>
       <div class="size-row" id="colorRow">${p.colors.map(c=>{ const out = colorStock(p,c)===0; return `<button class="size-btn color-btn ${c===selectedColor?'active':''}" data-color="${c}" ${out?'disabled title="Sin stock"':''}>${colorDot(c)}${c}</button>`; }).join('')}</div>` : ''}
       <div class="eyebrow">${p.sizes.every(isVolumeSize) ? 'Medida' : 'Talle'}</div>
@@ -2468,7 +2468,7 @@ function renderProductForm(id){
             <div style="overflow-x:auto;"><table class="variant-table" id="variantStockTable"></table></div>
             <span id="variantStockTotal" style="font-size:12px;color:var(--text-soft);display:block;margin-top:6px;"></span>
           </div>
-          <div class="field full"><label>Descripción</label><textarea required name="desc" rows="2">${p?p.desc:''}</textarea></div>
+          <div class="field full"><label>Descripción</label><textarea required name="desc" rows="4" placeholder="Podés escribir en varias líneas: apretá Enter para pasar a la siguiente.">${p?p.desc:''}</textarea></div>
           <div class="field full">
             <label>Fotos del producto (opcional, hasta ${MAX_PRODUCT_IMAGES})</label>
             <input type="file" accept="image/*" id="productImageInput" multiple>
