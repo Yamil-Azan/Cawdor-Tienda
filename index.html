@@ -962,9 +962,10 @@ const money = n => '$' + Number(n).toLocaleString('es-AR');
 const TYPE_LABELS = {
   body:'Bodys', enterito:'Enteritos', conjunto:'Conjuntos', pantalon:'Pantalones', jean:'Jeans', remera:'Remeras',
   accesorio:'Accesorios', media:'Medias', nidito:'Niditos y almohadones de amamantar',
-  combo:'Combos', ajuar:'Ajuares'
+  combo:'Combos', ajuar:'Ajuares',
+  calzado:'Calzados', importado:'Productos importados'
 };
-const TYPE_ORDER = ['body','enterito','conjunto','pantalon','jean','remera','accesorio','media','nidito','combo','ajuar'];
+const TYPE_ORDER = ['body','enterito','conjunto','pantalon','jean','remera','accesorio','media','nidito','combo','ajuar','calzado','importado'];
 const BABY_SIZE_OPTIONS = ['RN','0','1','0-3M','3-6M','3-8M','6-9M','9-12M','6-12M','12-18M','18-24M','24-36M'];
 // Talles de niños (ropa para chicos de 2 a 6 años)
 const KIDS_SIZE_OPTIONS = ['2','3','4','5','6'];
@@ -987,7 +988,10 @@ const AGE_FILTERS = [
 ];
 // Medidas en ml: solo se ofrecen para la categoría Accesorios (mamaderas, vasitos, etc.)
 const ACCESSORY_SIZE_OPTIONS = ['60 ml','120 ml','150 ml','180 ml','250 ml','270 ml','330 ml'];
+// Talles de calzado: solo se ofrecen para la categoría Calzados (del 16 al 26)
+const SHOE_SIZE_OPTIONS = Array.from({length:11}, (_,i)=>String(16+i));
 function sizeOptionsFor(type){
+  if(type === 'calzado') return SHOE_SIZE_OPTIONS;
   return type === 'accesorio' ? [...ACCESSORY_SIZE_OPTIONS, ...SIZE_OPTIONS] : SIZE_OPTIONS;
 }
 const isVolumeSize = size => /ml$/i.test(String(size||'').trim());
@@ -1127,7 +1131,9 @@ function iconFor(type,color){
     media:`<path d="M40 14 h20 v34 q18 4 18 26 a14 14 0 0 1 -14 14 h-10 q-4 0 -4 -6 v-16 h-10 q-4 0 -4 -4 v-48 z" fill="${c}" opacity="0.85"/>`,
     nidito:`<path d="M20 60 a30 30 0 0 1 60 0 q0 22 -30 22 t-30 -22 z" fill="${c}" opacity="0.55"/><circle cx="50" cy="52" r="16" fill="${c}" opacity="0.9"/>`,
     combo:`<rect x="22" y="30" width="56" height="46" rx="8" fill="${c}" opacity="0.55"/><path d="M22 44 h56" stroke="${c}" stroke-width="4"/><path d="M50 30 v46 M42 30 q0 -14 8 -14 t8 14" stroke="${c}" stroke-width="4" fill="none"/>`,
-    ajuar:`<path d="M24 34 a26 12 0 0 1 52 0 v30 a26 12 0 0 1 -52 0 z" fill="${c}" opacity="0.55"/><path d="M24 34 a26 12 0 0 0 52 0 a26 12 0 0 1 -52 0" fill="${c}" opacity="0.9"/><circle cx="50" cy="34" r="6" fill="${c}"/>`
+    ajuar:`<path d="M24 34 a26 12 0 0 1 52 0 v30 a26 12 0 0 1 -52 0 z" fill="${c}" opacity="0.55"/><path d="M24 34 a26 12 0 0 0 52 0 a26 12 0 0 1 -52 0" fill="${c}" opacity="0.9"/><circle cx="50" cy="34" r="6" fill="${c}"/>`,
+    calzado:`<path d="M24 38 q0 -10 10 -10 h10 q6 0 8 8 l4 14 q20 2 22 16 v6 h-54 z" fill="${c}" opacity="0.85"/><rect x="22" y="72" width="58" height="8" rx="4" fill="${c}"/>`,
+    importado:`<circle cx="50" cy="50" r="30" fill="${c}" opacity="0.55"/><path d="M20 50 h60 M50 20 q-16 30 0 60 M50 20 q16 30 0 60" stroke="${c}" stroke-width="4" fill="none"/>`
   };
   return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="max-width:150px;">${shapes[type]||shapes.body}</svg>`;
 }
@@ -2274,7 +2280,7 @@ function showCsvTemplateManually(){
   const csv = header + example;
   const win = window.open('', '_blank');
   if(win){
-    win.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">${csv.replace(/</g,'&lt;')}</pre><p style="font-family:sans-serif;color:#555;padding:0 20px;">Seleccioná todo este texto (Ctrl/Cmd+A), copialo, y pegalo en un archivo nuevo llamado <b>plantilla_productos_cawdor.csv</b> desde el Bloc de notas, Excel o Google Sheets.<br><br>Categorías válidas: body, enterito, conjunto, pantalon, jean, remera, accesorio, media, nidito, combo, ajuar.<br>"precio_anterior" es opcional: completalo solo si el producto está en oferta.<br>"precio_mayorista" es opcional: es el precio por unidad cuando el cliente lleva ${WHOLESALE_MIN_QTY} o más.</p>`);
+    win.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">${csv.replace(/</g,'&lt;')}</pre><p style="font-family:sans-serif;color:#555;padding:0 20px;">Seleccioná todo este texto (Ctrl/Cmd+A), copialo, y pegalo en un archivo nuevo llamado <b>plantilla_productos_cawdor.csv</b> desde el Bloc de notas, Excel o Google Sheets.<br><br>Categorías válidas: body, enterito, conjunto, pantalon, jean, remera, accesorio, media, nidito, combo, ajuar, calzado, importado.<br>"precio_anterior" es opcional: completalo solo si el producto está en oferta.<br>"precio_mayorista" es opcional: es el precio por unidad cuando el cliente lleva ${WHOLESALE_MIN_QTY} o más.</p>`);
   } else {
     showToast('Tu navegador bloqueó la ventana emergente. Habilitala e intentá de nuevo.');
   }
@@ -2333,7 +2339,9 @@ const TYPE_ALIASES = {
   media:'media', medias:'media',
   nidito:'nidito', niditos:'nidito', 'niditosyalmohadonesdeamamantar':'nidito', almohadon:'nidito', almohadones:'nidito',
   combo:'combo', combos:'combo',
-  ajuar:'ajuar', ajuares:'ajuar'
+  ajuar:'ajuar', ajuares:'ajuar',
+  calzado:'calzado', calzados:'calzado', zapato:'calzado', zapatos:'calzado', zapatilla:'calzado', zapatillas:'calzado',
+  importado:'importado', importados:'importado', 'productoimportado':'importado', 'productosimportados':'importado'
 };
 
 function handleCsvImport(ev){
