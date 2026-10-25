@@ -990,9 +990,26 @@ const AGE_FILTERS = [
 const ACCESSORY_SIZE_OPTIONS = ['60 ml','120 ml','150 ml','180 ml','250 ml','270 ml','330 ml'];
 // Talles de calzado: solo se ofrecen para la categoría Calzados (del 16 al 26)
 const SHOE_SIZE_OPTIONS = Array.from({length:11}, (_,i)=>String(16+i));
-function sizeOptionsFor(type){
+// Un producto puede estar en varias categorías (p.types). p.type queda como la principal
+// (la primera elegida) para el ícono y para los productos viejos que solo tienen una.
+function productTypes(p){
+  if(!p) return [];
+  if(Array.isArray(p.types) && p.types.length) return p.types;
+  return p.type ? [p.type] : [];
+}
+const productHasType = (p, t) => productTypes(p).includes(t);
+const typeLabelsOf = p => productTypes(p).map(t=>TYPE_LABELS[t]).filter(Boolean);
+function sizeOptionsForOne(type){
   if(type === 'calzado') return SHOE_SIZE_OPTIONS;
   return type === 'accesorio' ? [...ACCESSORY_SIZE_OPTIONS, ...SIZE_OPTIONS] : SIZE_OPTIONS;
+}
+// acepta una categoría o varias: junta los talles/medidas de todas sin repetir
+function sizeOptionsFor(types){
+  const list = (Array.isArray(types) ? types : [types]).filter(Boolean);
+  if(!list.length) return SIZE_OPTIONS;
+  const out = [];
+  list.forEach(t=>sizeOptionsForOne(t).forEach(s=>{ if(!out.includes(s)) out.push(s); }));
+  return out;
 }
 const isVolumeSize = size => /ml$/i.test(String(size||'').trim());
 const sizeLabel = size => isVolumeSize(size) ? 'Medida' : 'Talle';
@@ -1297,7 +1314,7 @@ function isOnOffer(p){ return !!(p.originalPrice && p.originalPrice > p.price); 
 
 function filteredProducts(){
   let list = products.filter(p=>{
-    if(filters.type!=='all' && p.type!==filters.type) return false;
+    if(filters.type!=='all' && !productHasType(p, filters.type)) return false;
     if(filters.age!=='all' && !productAgeGroups(p).has(filters.age)) return false;
     if(filters.onlyOffers && !isOnOffer(p)) return false;
     if(filters.search && !p.name.toLowerCase().includes(filters.search.toLowerCase())) return false;
@@ -1443,7 +1460,7 @@ function renderProductModal(){
     </div>
     ${imgs.length>1 ? `<div class="pm-thumbs">${imgs.map((src,i)=>`<button type="button" class="pm-thumb ${i===modalImgIdx?'active':''}" data-thumb="${i}" aria-label="Ver foto ${i+1}"><img src="${src}" alt=""></button>`).join('')}</div>` : ''}
     <div class="pm-body">
-      <span class="tag" style="${TAG_STYLE[p.color]}">${TYPE_LABELS[p.type]}</span>
+      ${typeLabelsOf(p).map(l=>`<span class="tag" style="${TAG_STYLE[p.color]}">${l}</span>`).join(' ')}
       <h2 style="margin-top:10px;">${p.name}</h2>
       <div class="price-block" style="margin-top:6px;">
         ${showsOffer(p, selectedSize) ? `<span class="price-old" style="font-size:13px;">${money(p.originalPrice)}</span>` : ''}
@@ -2232,7 +2249,7 @@ function renderAdminProducts(){
       <td><div style="width:30px;height:30px;border-radius:7px;overflow:hidden;background:var(--${p.color}-tint);display:flex;align-items:center;justify-content:center;">${p.image?`<img src="${p.image}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;">`:iconFor(p.type,p.color)}</div></td>
       <td style="overflow:hidden;">
         <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;">${p.name}</div>
-        <div style="font-size:10.5px;color:var(--text-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${TYPE_LABELS[p.type]}</div>
+        <div style="font-size:10.5px;color:var(--text-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${typeLabelsOf(p).join(' · ')}</div>
       </td>
       <td style="font-weight:700;white-space:nowrap;">${hasVariablePrice(p) ? '<span style="font-size:10px;font-weight:600;color:var(--text-soft);display:block;">desde</span>' + money(minPrice(p)) : money(p.price)}${hasWholesale(p) ? `<span style="font-size:10.5px;font-weight:700;color:#3E6C86;display:block;">May. ${money(p.wholesalePrice)}</span>` : ''}</td>
       <td>${p.stock}${hasColors(p)?`<span style="font-size:10.5px;color:var(--text-soft);display:block;">${p.colors.length} color${p.colors.length!==1?'es':''}${isGeneralStock(p)?' · stock general':''}</span>`:''}</td>
@@ -2394,21 +2411,22 @@ function handleCsvImport(ev){
     for(let i=1; i<rows.length; i++){
       const r = rows[i];
       const name = (r[idx.name]||'').trim();
-      const typeRaw = (r[idx.type]||'').trim().toLowerCase().replace(/\s+/g,'');
+      const typeParts = (r[idx.type]||'').split(/[|,]/).map(x=>x.trim().toLowerCase().replace(/\s+/g,'')).filter(Boolean);
+      const types = [...new Set(typeParts.map(x=>TYPE_ALIASES[x]).filter(Boolean))];
       const price = parseNumberAR(r[idx.price]);
       const originalPriceRaw = idx.originalPrice!==-1 ? parseNumberAR(r[idx.originalPrice]) : NaN;
       const wholesaleRaw = idx.wholesalePrice!==-1 ? parseNumberAR(r[idx.wholesalePrice]) : NaN;
       const stock = idx.stock!==-1 ? parseNumberAR(r[idx.stock]||'0') : 0;
       const sizes = idx.sizes!==-1 && r[idx.sizes] ? r[idx.sizes].split('|').map(s=>s.trim()).filter(Boolean) : ['Única'];
       const desc = idx.desc!==-1 ? (r[idx.desc]||'') : '';
-      const type = TYPE_ALIASES[typeRaw];
+      const type = types[0];
       if(!name || !type || !Number.isFinite(price)){
         skipped++;
         continue;
       }
       nextId++;
       products.push({
-        id: nextId, name, type, price,
+        id: nextId, name, type, types, price,
         originalPrice: Number.isFinite(originalPriceRaw) && originalPriceRaw > price ? originalPriceRaw : null,
         wholesalePrice: Number.isFinite(wholesaleRaw) && wholesaleRaw > 0 && wholesaleRaw < price ? wholesaleRaw : null,
         stock: Number.isFinite(stock)?stock:0,
@@ -2473,8 +2491,10 @@ function renderProductForm(id){
       <form id="productForm">
         <div class="form-grid">
           <div class="field full"><label>Nombre</label><input required name="name" value="${p?p.name:''}"></div>
-          <div class="field"><label>Categoría</label>
-            <select name="type" required>${TYPE_ORDER.map(t=>`<option value="${t}" ${p&&p.type===t?'selected':''}>${TYPE_LABELS[t]}</option>`).join('')}</select>
+          <div class="field full"><label>Categorías</label>
+            <span style="font-size:11.5px;color:var(--text-soft);display:block;margin-bottom:6px;">Podés elegir más de una (ej: Bodys + Productos importados). La primera que tildes es la principal.</span>
+            <div class="size-checkbox-row" id="typeCheckboxRow"></div>
+            <span id="typesError" class="field-error-msg"></span>
           </div>
           <div class="field"><label>Precio general (ARS)</label><input type="number" min="0" name="price" value="${p?p.price:''}" placeholder="Opcional si cada medida tiene su precio"><span style="font-size:11px;color:var(--text-soft);display:block;margin-top:4px;">Se usa para los talles o medidas sin precio propio.</span><span id="priceError" class="field-error-msg"></span></div>
           <div class="field"><label>Precio anterior (opcional, para oferta)</label><input type="number" min="0" name="originalPrice" value="${p&&p.originalPrice?p.originalPrice:''}" placeholder="Dejar vacío si no hay oferta"></div>
@@ -2551,6 +2571,7 @@ function renderProductForm(id){
   }
   updatePreview();
   // Talles/medidas tildados y precios por medida (se conservan al cambiar de categoría)
+  let formTypes = p ? productTypes(p).slice() : [];
   let formSizes = p ? p.sizes.slice() : [];
   let formSizePrices = p && p.sizePrices ? {...p.sizePrices} : {};
   // Colores y stock por talle + color
@@ -2621,8 +2642,7 @@ function renderProductForm(id){
     renderVariantStock();
   }
   function renderSizeCheckboxes(){
-    const type = document.querySelector('#productForm select[name="type"]').value;
-    const options = sizeOptionsFor(type);
+    const options = sizeOptionsFor(formTypes);
     // si se cambia a una categoría sin medidas en ml, se destildan esas medidas
     formSizes = formSizes.filter(s=>options.includes(s));
     const row = document.getElementById('sizeCheckboxRow');
@@ -2641,7 +2661,21 @@ function renderProductForm(id){
     });
     renderSizePriceRows();
   }
-  document.querySelector('#productForm select[name="type"]').addEventListener('change', renderSizeCheckboxes);
+  function renderTypeCheckboxes(){
+    const row = document.getElementById('typeCheckboxRow');
+    row.innerHTML = TYPE_ORDER.map(t=>`
+      <label class="size-checkbox ${formTypes.includes(t)?'active':''}">
+        <input type="checkbox" value="${t}" ${formTypes.includes(t)?'checked':''}>${TYPE_LABELS[t]}
+      </label>`).join('');
+    row.querySelectorAll('input').forEach(input=>input.addEventListener('change', ()=>{
+      if(input.checked){ if(!formTypes.includes(input.value)) formTypes.push(input.value); }
+      else formTypes = formTypes.filter(t=>t!==input.value);
+      input.closest('.size-checkbox').classList.toggle('active', input.checked);
+      document.getElementById('typesError').classList.remove('show');
+      renderSizeCheckboxes();
+    }));
+  }
+  renderTypeCheckboxes();
   document.querySelector('#productForm input[name="price"]').addEventListener('input', ()=>document.getElementById('priceError').classList.remove('show'));
   document.querySelector('#productForm input[name="wholesalePrice"]').addEventListener('input', ()=>document.getElementById('wholesaleError').classList.remove('show'));
   renderSizeCheckboxes();
@@ -2682,6 +2716,13 @@ function renderProductForm(id){
       const v = Number(formSizePrices[s]);
       if(Number.isFinite(v) && v > 0) sizePrices[s] = v;
     });
+    if(formTypes.length === 0){
+      const err = document.getElementById('typesError');
+      err.textContent = 'Elegí al menos una categoría';
+      err.classList.add('show');
+      document.getElementById('typeCheckboxRow').scrollIntoView({block:'center', behavior:'smooth'});
+      return;
+    }
     if(selectedSizes.length === 0){
       const err = document.getElementById('sizesError');
       err.textContent = 'Elegí al menos un talle';
@@ -2745,7 +2786,8 @@ function renderProductForm(id){
     }
     const data = {
       name: fd.get('name'),
-      type: fd.get('type'),
+      type: formTypes[0],
+      types: formTypes.slice(),
       price: generalPrice,
       originalPrice: originalPriceRaw ? Number(originalPriceRaw) : null,
       wholesalePrice,
@@ -2949,7 +2991,7 @@ let carouselIndex = 0;
 let carouselTimer = null;
 function carouselProducts(){
   // Prioriza combos y ofertas, y completa con el resto hasta un máximo de 6.
-  const featured = products.filter(p => p.type==='combo' || (p.originalPrice && p.originalPrice > p.price));
+  const featured = products.filter(p => productHasType(p,'combo') || (p.originalPrice && p.originalPrice > p.price));
   const rest = products.filter(p => !featured.includes(p));
   return [...featured, ...rest].slice(0, 6);
 }
@@ -2964,7 +3006,7 @@ function renderCarousel(){
     <div class="carousel-slide" data-open="${p.id}">
       <div class="carousel-slide-media" style="background:var(--${p.color}-tint);">${mediaFor(p,'cover')}</div>
       <div class="carousel-slide-info">
-        <span class="eyebrow">${p.type==='combo' ? '📦 Combo' : (p.originalPrice && p.originalPrice > p.price ? '🔥 Oferta' : 'Destacado')}</span>
+        <span class="eyebrow">${productHasType(p,'combo') ? '📦 Combo' : (p.originalPrice && p.originalPrice > p.price ? '🔥 Oferta' : 'Destacado')}</span>
         <h3>${p.name}</h3>
         <div class="price">
           ${!hasVariablePrice(p) && showsOffer(p, p.sizes[0]) ? `<span style="text-decoration:line-through;color:var(--text-soft);font-weight:600;margin-right:8px;">${money(p.originalPrice)}</span>` : ''}
