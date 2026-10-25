@@ -1014,22 +1014,37 @@ function hasVariablePrice(p){ return new Set(sizePriceList(p)).size > 1; }
 // Un producto puede tener colores (p.colors). En ese caso el stock se guarda por
 // combinación en p.variantStock = {"talle|color": cantidad} y p.stock es la suma de todo.
 // Los productos sin colores siguen usando un único stock (p.stock).
+// Si p.stockGeneral es true, el producto tiene colores pero no se sabe cuántos hay de cada
+// uno: se carga un solo stock general (p.stock) compartido entre todos los talles y colores.
 const variantKey = (size, color) => `${size}|${color}`;
 function hasColors(p){ return !!(p && Array.isArray(p.colors) && p.colors.length); }
+function isGeneralStock(p){ return hasColors(p) && !!p.stockGeneral; }
 function variantStock(p, size, color){
-  if(!hasColors(p)) return Number(p.stock)||0;
+  if(!hasColors(p) || isGeneralStock(p)) return Number(p.stock)||0;
   return Number((p.variantStock||{})[variantKey(size, color)])||0;
 }
-function colorStock(p, color){ return (p.sizes||[]).reduce((s,sz)=>s+variantStock(p, sz, color),0); }
-function sumVariantStock(p){ return (p.colors||[]).reduce((s,c)=>s+colorStock(p,c),0); }
+function colorStock(p, color){
+  if(isGeneralStock(p)) return Number(p.stock)||0;
+  return (p.sizes||[]).reduce((s,sz)=>s+variantStock(p, sz, color),0);
+}
+function sumVariantStock(p){
+  if(isGeneralStock(p)) return Number(p.stock)||0;
+  return (p.colors||[]).reduce((s,c)=>s+colorStock(p,c),0);
+}
 const sameColor = (a,b) => (a||null) === (b||null);
 // unidades de esa combinación talle + color que ya están en el carrito
 function qtyInCartFor(productId, size, color){
   return cart.filter(i=>i.productId===productId && i.size===size && sameColor(i.color,color)).reduce((s,i)=>s+i.qty,0);
 }
+// unidades de esa combinación que todavía se pueden agregar al carrito.
+// Con stock general, el disponible se comparte entre todos los talles y colores del producto.
+function freeStockFor(p, size, color){
+  if(isGeneralStock(p)) return Math.max(0, (Number(p.stock)||0) - productQtyInCart(p.id));
+  return Math.max(0, variantStock(p, size, color) - qtyInCartFor(p.id, size, color));
+}
 // descuenta lo vendido: por combinación si el producto tiene colores
 function deductStock(p, item){
-  if(hasColors(p)){
+  if(hasColors(p) && !isGeneralStock(p)){
     const k = variantKey(item.size, item.color);
     p.variantStock = p.variantStock || {};
     p.variantStock[k] = Math.max(0, (Number(p.variantStock[k])||0) - item.qty);
@@ -1413,7 +1428,7 @@ function renderProductModal(){
   if(modalImgIdx >= imgs.length) modalImgIdx = 0;
   const colored = hasColors(p);
   // unidades que todavía se pueden agregar de la combinación elegida
-  const available = colored ? Math.max(0, variantStock(p, selectedSize, selectedColor) - qtyInCartFor(p.id, selectedSize, selectedColor)) : p.stock;
+  const available = colored ? freeStockFor(p, selectedSize, selectedColor) : p.stock;
   if(modalQty > available) modalQty = Math.max(1, available);
   const soldOut = p.stock===0;
   const noneLeft = colored && !soldOut && available===0;
@@ -1490,8 +1505,8 @@ function addToCart(product, size, qty, color){
   const colored = hasColors(product);
   if(!colored) color = undefined;
   if(colored){
-    const free = variantStock(product, size, color) - qtyInCartFor(product.id, size, color);
-    if(free <= 0){ showToast('No quedan más unidades de ese talle y color'); return; }
+    const free = freeStockFor(product, size, color);
+    if(free <= 0){ showToast(isGeneralStock(product) ? 'No quedan más unidades de este producto' : 'No quedan más unidades de ese talle y color'); return; }
     qty = Math.min(qty, free);
   }
   const existing = cartEntryFor(product.id, size, color);
@@ -1560,7 +1575,7 @@ function renderDrawer(){
   `;
   wrap.querySelectorAll('[data-inc]').forEach(b=>b.onclick=()=>{
     const idx=Number(b.dataset.inc); const p=products.find(x=>x.id===cart[idx].productId);
-    if(cart[idx].qty<(hasColors(p)?variantStock(p, cart[idx].size, cart[idx].color):p.stock)){cart[idx].qty++; saveCart(); renderDrawer(); updateCartCount(); renderGrid();}
+    if(isGeneralStock(p) ? productQtyInCart(p.id) < p.stock : cart[idx].qty<(hasColors(p)?variantStock(p, cart[idx].size, cart[idx].color):p.stock)){cart[idx].qty++; saveCart(); renderDrawer(); updateCartCount(); renderGrid();}
   });
   wrap.querySelectorAll('[data-dec]').forEach(b=>b.onclick=()=>{
     const idx=Number(b.dataset.dec);
@@ -2220,7 +2235,7 @@ function renderAdminProducts(){
         <div style="font-size:10.5px;color:var(--text-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${TYPE_LABELS[p.type]}</div>
       </td>
       <td style="font-weight:700;white-space:nowrap;">${hasVariablePrice(p) ? '<span style="font-size:10px;font-weight:600;color:var(--text-soft);display:block;">desde</span>' + money(minPrice(p)) : money(p.price)}${hasWholesale(p) ? `<span style="font-size:10.5px;font-weight:700;color:#3E6C86;display:block;">May. ${money(p.wholesalePrice)}</span>` : ''}</td>
-      <td>${p.stock}${hasColors(p)?`<span style="font-size:10.5px;color:var(--text-soft);display:block;">${p.colors.length} color${p.colors.length!==1?'es':''}</span>`:''}</td>
+      <td>${p.stock}${hasColors(p)?`<span style="font-size:10.5px;color:var(--text-soft);display:block;">${p.colors.length} color${p.colors.length!==1?'es':''}${isGeneralStock(p)?' · stock general':''}</span>`:''}</td>
       <td style="display:flex;gap:4px;">
         <button class="icon-action-btn" data-edit="${p.id}" title="Editar" aria-label="Editar">✎</button>
         <button class="icon-action-btn danger" data-del="${p.id}" title="Eliminar" aria-label="Eliminar">🗑</button>
@@ -2485,10 +2500,17 @@ function renderProductForm(id){
             <div id="colorChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"></div>
           </div>
           <div class="field full" id="variantStockWrap" style="display:none;">
-            <label>Stock por talle y color</label>
-            <span style="font-size:11.5px;color:var(--text-soft);display:block;margin-bottom:6px;">Poné 0 en las combinaciones que no tenés. En la tienda solo se van a poder elegir las que tengan stock.</span>
-            <div style="overflow-x:auto;"><table class="variant-table" id="variantStockTable"></table></div>
-            <span id="variantStockTotal" style="font-size:12px;color:var(--text-soft);display:block;margin-top:6px;"></span>
+            <label class="notes-toggle" style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;cursor:pointer;">
+              <input type="checkbox" id="generalStockToggle" ${p && p.stockGeneral ? 'checked' : ''}>
+              No sé cuántos hay de cada color: cargar un stock general
+            </label>
+            <div id="variantStockDetail">
+              <label>Stock por talle y color</label>
+              <span style="font-size:11.5px;color:var(--text-soft);display:block;margin-bottom:6px;">Poné 0 en las combinaciones que no tenés. En la tienda solo se van a poder elegir las que tengan stock.</span>
+              <div style="overflow-x:auto;"><table class="variant-table" id="variantStockTable"></table></div>
+              <span id="variantStockTotal" style="font-size:12px;color:var(--text-soft);display:block;margin-top:6px;"></span>
+            </div>
+            <span id="generalStockHint" style="display:none;font-size:11.5px;color:var(--text-soft);">Cargá el disponible total en el campo <b>Stock</b>. En la tienda se van a poder elegir todos los colores y talles, y cada venta descuenta de ese total.</span>
           </div>
           <div class="field full"><label>Descripción</label><textarea required name="desc" rows="4" placeholder="Podés escribir en varias líneas: apretá Enter para pasar a la siguiente.">${p?p.desc:''}</textarea></div>
           <div class="field full">
@@ -2549,8 +2571,11 @@ function renderProductForm(id){
   function renderVariantStock(){
     readVariantInputs();
     const colored = formColors.length > 0;
-    document.getElementById('plainStockField').style.display = colored ? 'none' : '';
+    const general = colored && document.getElementById('generalStockToggle').checked;
+    document.getElementById('plainStockField').style.display = (colored && !general) ? 'none' : '';
     document.getElementById('variantStockWrap').style.display = colored ? 'block' : 'none';
+    document.getElementById('variantStockDetail').style.display = general ? 'none' : '';
+    document.getElementById('generalStockHint').style.display = general ? 'block' : 'none';
     document.getElementById('colorChips').innerHTML = formColors.map((c,i)=>`<span class="color-chip">${colorDot(c)}${c}<button type="button" data-del-color="${i}" aria-label="Quitar ${c}">✕</button></span>`).join('');
     document.querySelectorAll('[data-del-color]').forEach(b=>b.onclick=()=>{ readVariantInputs(); formColors.splice(Number(b.dataset.delColor),1); renderVariantStock(); });
     const table = document.getElementById('variantStockTable');
@@ -2621,6 +2646,7 @@ function renderProductForm(id){
   document.querySelector('#productForm input[name="wholesalePrice"]').addEventListener('input', ()=>document.getElementById('wholesaleError').classList.remove('show'));
   renderSizeCheckboxes();
   document.getElementById('addColorBtn').onclick = addColorsFromInput;
+  document.getElementById('generalStockToggle').addEventListener('change', renderVariantStock);
   document.getElementById('colorNameInput').addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); addColorsFromInput(); } });
   document.querySelector('#productForm input[name="stock"]').addEventListener('input', ()=>document.getElementById('stockError').classList.remove('show'));
   document.getElementById('productImageInput').onchange = async (ev)=>{
@@ -2666,7 +2692,8 @@ function renderProductForm(id){
     if(document.getElementById('colorNameInput').value.trim()) addColorsFromInput();
     readVariantInputs();
     let variantStockData = null, stockValue;
-    if(formColors.length){
+    const generalStock = formColors.length > 0 && document.getElementById('generalStockToggle').checked;
+    if(formColors.length && !generalStock){
       variantStockData = {};
       selectedSizes.forEach(s=>formColors.forEach(c=>{ variantStockData[variantKey(s,c)] = Number(formVariantStock[variantKey(s,c)])||0; }));
       stockValue = Object.values(variantStockData).reduce((a,b)=>a+b,0);
@@ -2725,6 +2752,7 @@ function renderProductForm(id){
       stock: stockValue,
       colors: formColors.length ? formColors.slice() : null,
       variantStock: variantStockData,
+      stockGeneral: generalStock,
       sizes: selectedSizes,
       sizePrices: Object.keys(sizePrices).length ? sizePrices : null,
       desc: fd.get('desc'),
