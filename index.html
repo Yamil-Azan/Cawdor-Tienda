@@ -960,12 +960,12 @@
 };
 const money = n => '$' + Number(n).toLocaleString('es-AR');
 const TYPE_LABELS = {
-  body:'Bodys', enterito:'Enteritos', conjunto:'Conjuntos', pantalon:'Pantalones', jean:'Jeans', remera:'Remeras',
+  body:'Bodys', enterito:'Enteritos', conjunto:'Conjuntos', pantalon:'Pantalones', jean:'Jeans', remera:'Remeras', campera:'Camperas',
   accesorio:'Accesorios', media:'Medias', nidito:'Niditos y almohadones de amamantar',
   combo:'Combos', ajuar:'Ajuares',
   calzado:'Calzados', importado:'Productos importados'
 };
-const TYPE_ORDER = ['body','enterito','conjunto','pantalon','jean','remera','accesorio','media','nidito','combo','ajuar','calzado','importado'];
+const TYPE_ORDER = ['body','enterito','conjunto','pantalon','jean','remera','campera','accesorio','media','nidito','combo','ajuar','calzado','importado'];
 const BABY_SIZE_OPTIONS = ['RN','0','1','0-3M','3-6M','3-8M','6-9M','9-12M','6-12M','12-18M','18-24M','24-36M'];
 // Talles de niños (ropa para chicos de 2 a 6 años)
 const KIDS_SIZE_OPTIONS = ['2','3','4','5','6'];
@@ -1159,6 +1159,7 @@ function iconFor(type,color){
     conjunto:`<path d="M30 18 L70 18 L74 34 L62 38 L62 52 L38 52 L38 38 L26 34 Z" fill="${c}" opacity="0.9"/><rect x="36" y="54" width="28" height="34" rx="8" fill="${c}" opacity="0.6"/>`,
     pantalon:`<path d="M34 18 h32 v14 l-4 50 q-1 8 -8 8 t-8 -8 l-2 -30 h-4 l-2 30 q-1 8 -8 8 t-8 -8 z" fill="${c}" opacity="0.85"/><rect x="34" y="14" width="32" height="8" rx="3" fill="${c}"/>`,
     remera:`<path d="M32 20 L44 14 L50 20 L56 14 L68 20 L74 34 L64 40 L64 84 L36 84 L36 40 L26 34 Z" fill="${c}" opacity="0.85"/>`,
+    campera:`<path d="M32 20 L44 14 L50 22 L56 14 L68 20 L76 36 L76 80 L66 80 L64 44 L64 86 L36 86 L36 44 L34 80 L24 80 L24 36 Z" fill="${c}" opacity="0.85"/><path d="M50 22 V86" stroke="#fff" stroke-width="2" opacity="0.7"/><path d="M44 14 Q50 8 56 14" stroke="${c}" stroke-width="4" fill="none"/>`,
     accesorio:`<path d="M50 18 a24 24 0 0 1 24 24 L26 42 a24 24 0 0 1 24 -24 Z" fill="${c}" opacity="0.85"/><rect x="24" y="42" width="52" height="9" rx="4" fill="${c}"/>`,
     media:`<path d="M40 14 h20 v34 q18 4 18 26 a14 14 0 0 1 -14 14 h-10 q-4 0 -4 -6 v-16 h-10 q-4 0 -4 -4 v-48 z" fill="${c}" opacity="0.85"/>`,
     nidito:`<path d="M20 60 a30 30 0 0 1 60 0 q0 22 -30 22 t-30 -22 z" fill="${c}" opacity="0.55"/><circle cx="50" cy="52" r="16" fill="${c}" opacity="0.9"/>`,
@@ -2312,7 +2313,7 @@ function showCsvTemplateManually(){
   const csv = header + example;
   const win = window.open('', '_blank');
   if(win){
-    win.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">${csv.replace(/</g,'&lt;')}</pre><p style="font-family:sans-serif;color:#555;padding:0 20px;">Seleccioná todo este texto (Ctrl/Cmd+A), copialo, y pegalo en un archivo nuevo llamado <b>plantilla_productos_cawdor.csv</b> desde el Bloc de notas, Excel o Google Sheets.<br><br>Categorías válidas: body, enterito, conjunto, pantalon, jean, remera, accesorio, media, nidito, combo, ajuar, calzado, importado.<br>"precio_anterior" es opcional: completalo solo si el producto está en oferta.<br>"precio_mayorista" es opcional: es el precio por unidad cuando el cliente lleva ${WHOLESALE_MIN_QTY} o más.</p>`);
+    win.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">${csv.replace(/</g,'&lt;')}</pre><p style="font-family:sans-serif;color:#555;padding:0 20px;">Seleccioná todo este texto (Ctrl/Cmd+A), copialo, y pegalo en un archivo nuevo llamado <b>plantilla_productos_cawdor.csv</b> desde el Bloc de notas, Excel o Google Sheets.<br><br>Categorías válidas: body, enterito, conjunto, pantalon, jean, remera, campera, accesorio, media, nidito, combo, ajuar, calzado, importado.<br>"precio_anterior" es opcional: completalo solo si el producto está en oferta.<br>"precio_mayorista" es opcional: es el precio por unidad cuando el cliente lleva ${WHOLESALE_MIN_QTY} o más.</p>`);
   } else {
     showToast('Tu navegador bloqueó la ventana emergente. Habilitala e intentá de nuevo.');
   }
@@ -2367,6 +2368,7 @@ const TYPE_ALIASES = {
   jean:'jean', jeans:'jean', jeanes:'jean',
   enterito:'enterito', enteritos:'enterito',
   remera:'remera', remeras:'remera',
+  campera:'campera', camperas:'campera',
   accesorio:'accesorio', accesorios:'accesorio',
   media:'media', medias:'media',
   nidito:'nidito', niditos:'nidito', 'niditosyalmohadonesdeamamantar':'nidito', almohadon:'nidito', almohadones:'nidito',
