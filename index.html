@@ -958,6 +958,12 @@
     return { key, value, shared: true };
   }
 };
+// Clave del panel guardada como huella (SHA-256), no en texto plano
+const ADMIN_PASS_HASH = 'fbea8a6913621fbb52e9fe44cf14045c4eca0557e4f3572fe292666cdb7c8d1a';
+async function hashAdminPass(text){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
 const money = n => '$' + Number(n).toLocaleString('es-AR');
 const TYPE_LABELS = {
   body:'Bodys', enterito:'Enteritos', conjunto:'Conjuntos', pantalon:'Pantalones', jean:'Jeans', remera:'Remeras', campera:'Camperas',
@@ -2161,12 +2167,11 @@ function renderAdmin(){
         <p style="color:var(--text-soft);font-size:13.5px;margin-bottom:18px;">Ingresá la clave para gestionar productos y pedidos.</p>
         <div class="field"><input type="password" id="adminPass" placeholder="Clave"></div>
         <button class="btn btn-sage" style="width:100%;justify-content:center;" id="adminEnter">Entrar</button>
-        <p style="font-size:11.5px;color:var(--text-soft);margin-top:12px;">Clave de demo: admin123</p>
       </div>`;
     document.getElementById('adminGateClose').onclick = toggleAdmin;
-    const tryLogin = ()=>{
+    const tryLogin = async ()=>{
       const val = document.getElementById('adminPass').value;
-      if(val==='admin123'){ isAdmin=true; renderAdmin(); } else { showToast('Clave incorrecta'); }
+      if(await hashAdminPass(val)===ADMIN_PASS_HASH){ isAdmin=true; renderAdmin(); } else { showToast('Clave incorrecta'); }
     };
     document.getElementById('adminEnter').onclick = tryLogin;
     document.getElementById('adminPass').addEventListener('keydown', (ev)=>{
