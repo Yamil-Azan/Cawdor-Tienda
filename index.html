@@ -966,12 +966,12 @@ async function hashAdminPass(text){
 }
 const money = n => '$' + Number(n).toLocaleString('es-AR');
 const TYPE_LABELS = {
-  body:'Bodys', enterito:'Enteritos', conjunto:'Conjuntos', pantalon:'Pantalones', jean:'Jeans', remera:'Remeras', vestido:'Vestidos', campera:'Camperas',
+  body:'Bodys', enterito:'Enteritos', conjunto:'Conjuntos', pantalon:'Pantalones', jean:'Jeans', remera:'Remeras', campera:'Camperas',
   accesorio:'Accesorios', media:'Medias', nidito:'Niditos y almohadones de amamantar',
   combo:'Combos', ajuar:'Ajuares',
   calzado:'Calzados', importado:'Productos importados'
 };
-const TYPE_ORDER = ['body','enterito','conjunto','pantalon','jean','remera','vestido','campera','accesorio','media','nidito','combo','ajuar','calzado','importado'];
+const TYPE_ORDER = ['body','enterito','conjunto','pantalon','jean','remera','campera','accesorio','media','nidito','combo','ajuar','calzado','importado'];
 const BABY_SIZE_OPTIONS = ['RN','0','1','0-3M','3-6M','3-8M','6-9M','9-12M','6-12M','12-18M','18-24M','24-36M'];
 // Talles de niños (ropa para chicos de 2 a 6 años)
 const KIDS_SIZE_OPTIONS = ['2','3','4','5','6'];
@@ -1165,7 +1165,6 @@ function iconFor(type,color){
     conjunto:`<path d="M30 18 L70 18 L74 34 L62 38 L62 52 L38 52 L38 38 L26 34 Z" fill="${c}" opacity="0.9"/><rect x="36" y="54" width="28" height="34" rx="8" fill="${c}" opacity="0.6"/>`,
     pantalon:`<path d="M34 18 h32 v14 l-4 50 q-1 8 -8 8 t-8 -8 l-2 -30 h-4 l-2 30 q-1 8 -8 8 t-8 -8 z" fill="${c}" opacity="0.85"/><rect x="34" y="14" width="32" height="8" rx="3" fill="${c}"/>`,
     remera:`<path d="M32 20 L44 14 L50 20 L56 14 L68 20 L74 34 L64 40 L64 84 L36 84 L36 40 L26 34 Z" fill="${c}" opacity="0.85"/>`,
-    vestido:`<path d="M40 14 L60 14 L62 26 L70 30 L66 40 L60 38 L76 84 Q50 92 24 84 L40 38 L34 40 L30 30 L38 26 Z" fill="${c}" opacity="0.85"/><path d="M38 40 Q50 46 62 40" stroke="#fff" stroke-width="2" fill="none" opacity="0.7"/>`,
     campera:`<path d="M32 20 L44 14 L50 22 L56 14 L68 20 L76 36 L76 80 L66 80 L64 44 L64 86 L36 86 L36 44 L34 80 L24 80 L24 36 Z" fill="${c}" opacity="0.85"/><path d="M50 22 V86" stroke="#fff" stroke-width="2" opacity="0.7"/><path d="M44 14 Q50 8 56 14" stroke="${c}" stroke-width="4" fill="none"/>`,
     accesorio:`<path d="M50 18 a24 24 0 0 1 24 24 L26 42 a24 24 0 0 1 24 -24 Z" fill="${c}" opacity="0.85"/><rect x="24" y="42" width="52" height="9" rx="4" fill="${c}"/>`,
     media:`<path d="M40 14 h20 v34 q18 4 18 26 a14 14 0 0 1 -14 14 h-10 q-4 0 -4 -6 v-16 h-10 q-4 0 -4 -4 v-48 z" fill="${c}" opacity="0.85"/>`,
@@ -1664,16 +1663,16 @@ function renderCheckout(){
         <div id="checkoutStep1" style="display:${checkoutStep===1?'block':'none'};">
         <div class="eyebrow" style="margin:14px 0 8px;">Datos de contacto</div>
         <div class="form-grid">
-          <div class="field"><label>Nombre y apellido</label><input required name="fullname" placeholder="María Gómez"><span class="field-error-msg">Completá tu nombre y apellido</span></div>
-          <div class="field"><label>Teléfono</label><input required name="phone" placeholder="381 555-0000"><span class="field-error-msg">Completá tu teléfono</span></div>
-          <div class="field full"><label>Email</label><input required type="email" name="email" placeholder="maria@mail.com"><span class="field-error-msg">Ingresá un email válido</span></div>
+          <div class="field"><label>Nombre y apellido</label><input required name="fullname" placeholder="Tu nombre completo"><span class="field-error-msg">Completá tu nombre y apellido</span></div>
+          <div class="field"><label>Teléfono</label><input required name="phone" placeholder="Con código de área, sin 0 ni 15"><span class="field-error-msg">Completá tu teléfono</span></div>
+          <div class="field full"><label>Email</label><input required type="email" name="email" placeholder="Tu correo electrónico"><span class="field-error-msg">Ingresá un email válido</span></div>
         </div>
         <div class="eyebrow" style="margin:6px 0 8px;">Dirección de envío</div>
         <div class="form-grid">
-          <div class="field full"><label>Calle y número</label><input required name="street" placeholder="Av. Siempre Viva 742"><span class="field-error-msg">Completá la calle y número</span></div>
-          <div class="field"><label>Ciudad</label><input required name="city" placeholder="San Miguel de Tucumán"><span class="field-error-msg">Completá la ciudad</span></div>
-          <div class="field"><label>Provincia</label><input required name="province" placeholder="Tucumán"><span class="field-error-msg">Completá la provincia</span></div>
-          <div class="field"><label>Código postal</label><input required name="zip" placeholder="4000"><span class="field-error-msg">Completá el código postal</span></div>
+          <div class="field full"><label>Calle y número</label><input required name="street" placeholder="Calle, número, piso y depto."><span class="field-error-msg">Completá la calle y número</span></div>
+          <div class="field"><label>Ciudad</label><input required name="city" placeholder="Tu ciudad"><span class="field-error-msg">Completá la ciudad</span></div>
+          <div class="field"><label>Provincia</label><input required name="province" placeholder="Tu provincia"><span class="field-error-msg">Completá la provincia</span></div>
+          <div class="field"><label>Código postal</label><input required name="zip" placeholder="Tu código postal"><span class="field-error-msg">Completá el código postal</span></div>
         </div>
         <label class="notes-toggle">
           <input type="checkbox" id="notesToggle" name="wantsNotes">
@@ -2332,7 +2331,7 @@ function showCsvTemplateManually(){
   const csv = header + example;
   const win = window.open('', '_blank');
   if(win){
-    win.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">${csv.replace(/</g,'&lt;')}</pre><p style="font-family:sans-serif;color:#555;padding:0 20px;">Seleccioná todo este texto (Ctrl/Cmd+A), copialo, y pegalo en un archivo nuevo llamado <b>plantilla_productos_cawdor.csv</b> desde el Bloc de notas, Excel o Google Sheets.<br><br>Categorías válidas: body, enterito, conjunto, pantalon, jean, remera, vestido, campera, accesorio, media, nidito, combo, ajuar, calzado, importado.<br>"precio_anterior" es opcional: completalo solo si el producto está en oferta.<br>"precio_mayorista" es opcional: es el precio por unidad cuando el cliente lleva ${WHOLESALE_MIN_QTY} o más.</p>`);
+    win.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">${csv.replace(/</g,'&lt;')}</pre><p style="font-family:sans-serif;color:#555;padding:0 20px;">Seleccioná todo este texto (Ctrl/Cmd+A), copialo, y pegalo en un archivo nuevo llamado <b>plantilla_productos_cawdor.csv</b> desde el Bloc de notas, Excel o Google Sheets.<br><br>Categorías válidas: body, enterito, conjunto, pantalon, jean, remera, campera, accesorio, media, nidito, combo, ajuar, calzado, importado.<br>"precio_anterior" es opcional: completalo solo si el producto está en oferta.<br>"precio_mayorista" es opcional: es el precio por unidad cuando el cliente lleva ${WHOLESALE_MIN_QTY} o más.</p>`);
   } else {
     showToast('Tu navegador bloqueó la ventana emergente. Habilitala e intentá de nuevo.');
   }
@@ -2387,7 +2386,6 @@ const TYPE_ALIASES = {
   jean:'jean', jeans:'jean', jeanes:'jean',
   enterito:'enterito', enteritos:'enterito',
   remera:'remera', remeras:'remera',
-  vestido:'vestido', vestidos:'vestido', vestidito:'vestido', vestiditos:'vestido',
   campera:'campera', camperas:'campera',
   accesorio:'accesorio', accesorios:'accesorio',
   media:'media', medias:'media',
