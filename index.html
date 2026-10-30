@@ -969,9 +969,9 @@ const TYPE_LABELS = {
   body:'Bodys', enterito:'Enteritos', conjunto:'Conjuntos', pantalon:'Pantalones', jean:'Jeans', remera:'Remeras', campera:'Camperas',
   accesorio:'Accesorios', media:'Medias', nidito:'Niditos y almohadones de amamantar',
   combo:'Combos', ajuar:'Ajuares',
-  calzado:'Calzados', importado:'Productos importados'
+  calzado:'Calzados', manta:'Mantas', importado:'Productos importados'
 };
-const TYPE_ORDER = ['body','enterito','conjunto','pantalon','jean','remera','campera','accesorio','media','nidito','combo','ajuar','calzado','importado'];
+const TYPE_ORDER = ['body','enterito','conjunto','pantalon','jean','remera','campera','accesorio','media','nidito','combo','ajuar','calzado','manta','importado'];
 const BABY_SIZE_OPTIONS = ['RN','0','1','0-3M','3-6M','3-8M','6-9M','9-12M','6-12M','12-18M','18-24M','24-36M'];
 // Talles de niños (ropa para chicos de 2 a 6 años)
 const KIDS_SIZE_OPTIONS = ['2','3','4','5','6'];
@@ -996,6 +996,8 @@ const AGE_FILTERS = [
 const ACCESSORY_SIZE_OPTIONS = ['60 ml','120 ml','150 ml','180 ml','250 ml','270 ml','330 ml'];
 // Talles de calzado: solo se ofrecen para la categoría Calzados (del 16 al 26)
 const SHOE_SIZE_OPTIONS = Array.from({length:11}, (_,i)=>String(16+i));
+// Medidas de mantas: solo se ofrecen para la categoría Mantas
+const BLANKET_SIZE_OPTIONS = ['Chica','Grande'];
 // Un producto puede estar en varias categorías (p.types). p.type queda como la principal
 // (la primera elegida) para el ícono y para los productos viejos que solo tienen una.
 function productTypes(p){
@@ -1007,6 +1009,7 @@ const productHasType = (p, t) => productTypes(p).includes(t);
 const typeLabelsOf = p => productTypes(p).map(t=>TYPE_LABELS[t]).filter(Boolean);
 function sizeOptionsForOne(type){
   if(type === 'calzado') return SHOE_SIZE_OPTIONS;
+  if(type === 'manta') return BLANKET_SIZE_OPTIONS;
   return type === 'accesorio' ? [...ACCESSORY_SIZE_OPTIONS, ...SIZE_OPTIONS] : SIZE_OPTIONS;
 }
 // acepta una categoría o varias: junta los talles/medidas de todas sin repetir
@@ -1017,7 +1020,7 @@ function sizeOptionsFor(types){
   list.forEach(t=>sizeOptionsForOne(t).forEach(s=>{ if(!out.includes(s)) out.push(s); }));
   return out;
 }
-const isVolumeSize = size => /ml$/i.test(String(size||'').trim());
+const isVolumeSize = size => /ml$/i.test(String(size||'').trim()) || BLANKET_SIZE_OPTIONS.includes(String(size||'').trim());
 const sizeLabel = size => isVolumeSize(size) ? 'Medida' : 'Talle';
 // Precio de un producto para un talle/medida puntual. Si esa medida no tiene
 // un precio propio cargado, se usa el precio general del producto.
@@ -1172,6 +1175,7 @@ function iconFor(type,color){
     combo:`<rect x="22" y="30" width="56" height="46" rx="8" fill="${c}" opacity="0.55"/><path d="M22 44 h56" stroke="${c}" stroke-width="4"/><path d="M50 30 v46 M42 30 q0 -14 8 -14 t8 14" stroke="${c}" stroke-width="4" fill="none"/>`,
     ajuar:`<path d="M24 34 a26 12 0 0 1 52 0 v30 a26 12 0 0 1 -52 0 z" fill="${c}" opacity="0.55"/><path d="M24 34 a26 12 0 0 0 52 0 a26 12 0 0 1 -52 0" fill="${c}" opacity="0.9"/><circle cx="50" cy="34" r="6" fill="${c}"/>`,
     calzado:`<path d="M24 38 q0 -10 10 -10 h10 q6 0 8 8 l4 14 q20 2 22 16 v6 h-54 z" fill="${c}" opacity="0.85"/><rect x="22" y="72" width="58" height="8" rx="4" fill="${c}"/>`,
+    manta:`<rect x="22" y="24" width="56" height="52" rx="6" fill="${c}" opacity="0.55"/><path d="M22 62 q14 -8 28 0 t28 0 v8 a6 6 0 0 1 -6 6 h-44 a6 6 0 0 1 -6 -6 z" fill="${c}" opacity="0.9"/><path d="M30 34 h40 M30 44 h40" stroke="#fff" stroke-width="2" opacity="0.6"/>`,
     importado:`<circle cx="50" cy="50" r="30" fill="${c}" opacity="0.55"/><path d="M20 50 h60 M50 20 q-16 30 0 60 M50 20 q16 30 0 60" stroke="${c}" stroke-width="4" fill="none"/>`
   };
   return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="max-width:150px;">${shapes[type]||shapes.body}</svg>`;
@@ -2393,6 +2397,7 @@ const TYPE_ALIASES = {
   combo:'combo', combos:'combo',
   ajuar:'ajuar', ajuares:'ajuar',
   calzado:'calzado', calzados:'calzado', zapato:'calzado', zapatos:'calzado', zapatilla:'calzado', zapatillas:'calzado',
+  manta:'manta', mantas:'manta', mantita:'manta', mantitas:'manta',
   importado:'importado', importados:'importado', 'productoimportado':'importado', 'productosimportados':'importado'
 };
 
