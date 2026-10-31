@@ -936,13 +936,13 @@
         return raw !== null ? { key, value: raw, shared: false } : null;
       } catch(e){ return null; }
     }
-    try {
-      const res = await fetch('/api/storage?key=' + encodeURIComponent(key), { cache: 'no-store' });
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (data.value === null || data.value === undefined) return null;
-      return { key, value: data.value, shared: true };
-    } catch(e){ return null; }
+    // Si la API falla se lanza un error (no se devuelve null), para no
+    // confundir "error de conexión" con "base vacía" y pisar el catálogo.
+    const res = await fetch('/api/storage?key=' + encodeURIComponent(key), { cache: 'no-store' });
+    if (!res.ok) throw new Error('No se pudo leer ' + key + ' (' + res.status + ')');
+    const data = await res.json();
+    if (data.value === null || data.value === undefined) return null;
+    return { key, value: data.value, shared: true };
   },
   async set(key, value, shared) {
     if (!shared) {
@@ -1197,8 +1197,13 @@ async function loadData(){
     const p = await window.storage.get('products', true);
     products = p ? JSON.parse(p.value) : seedProducts();
     if(!p){ await window.storage.set('products', JSON.stringify(products), true); }
-  }catch(e){ products = seedProducts(); try{ await window.storage.set('products', JSON.stringify(products), true);}catch(e2){} }
-  await ensureMamaderasOnly();
+    await ensureMamaderasOnly();
+  }catch(e){
+    console.error(e);
+    products = [];
+    window.__catalogLoadFailed = true;
+    showToast('⚠️ No se pudo cargar el catálogo. Recargá la página.');
+  }
 
   try{
     const o = await window.storage.get('orders', true);
@@ -1244,6 +1249,7 @@ async function ensureMamaderasOnly(){
 }
 
 async function saveProducts(){
+  if(window.__catalogLoadFailed){ showToast('⚠️ El catálogo no cargó bien: recargá antes de guardar.'); return false; }
   try{ await window.storage.set('products', JSON.stringify(products), true); return true; }
   catch(e){ showToast('⚠️ No se pudo guardar el catálogo. Probá de nuevo.'); return false; }
 }
@@ -1258,7 +1264,7 @@ async function updateProducts(mutator){
   try{
     const r = await window.storage.get('products', true);
     if(r) products = JSON.parse(r.value);
-  }catch(e){}
+  }catch(e){ showToast('⚠️ No se pudo leer el catálogo. No se guardó nada.'); return false; }
   mutator(products);
   return await saveProducts();
 }
@@ -1266,7 +1272,7 @@ async function updateOrders(mutator){
   try{
     const r = await window.storage.get('orders', true);
     if(r) orders = JSON.parse(r.value);
-  }catch(e){}
+  }catch(e){ showToast('No se pudo leer los pedidos. Probá de nuevo.'); return false; }
   mutator(orders);
   return await saveOrders();
 }
@@ -2430,7 +2436,7 @@ function handleCsvImport(ev){
     try{
       const latest = await window.storage.get('products', true);
       if(latest) products = JSON.parse(latest.value);
-    }catch(e){}
+    }catch(e){ showToast('⚠️ No se pudo leer el catálogo. No se importó nada.'); return; }
     let added = 0, skipped = 0;
     let nextId = products.length ? Math.max(...products.map(x=>x.id)) : 0;
     for(let i=1; i<rows.length; i++){
