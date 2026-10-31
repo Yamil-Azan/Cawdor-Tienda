@@ -971,8 +971,9 @@ const TYPE_LABELS = {
   combo:'Combos', ajuar:'Ajuares',
   calzado:'Calzados', manta:'Mantas', importado:'Productos importados'
 };
-const TYPE_ORDER = ['body','enterito','conjunto','pantalon','jean','remera','vestido','campera','accesorio','media','nidito','combo','ajuar','calzado','manta','importado'];
-const BABY_SIZE_OPTIONS = ['RN','0','1','0-3M','3-6M','3-8M','6-9M','9-12M','6-12M','12-18M','18-24M','24-36M'];
+// Categorías ordenadas alfabéticamente por el nombre que se muestra
+const TYPE_ORDER = Object.keys(TYPE_LABELS).sort((a,b)=>TYPE_LABELS[a].localeCompare(TYPE_LABELS[b],'es',{sensitivity:'base'}));
+const BABY_SIZE_OPTIONS = ['RN','0','1','0-3M','3-6M','3-8M','6-9M','6-12M','9-12M','12-18M','18-24M','24-36M'];
 // Talles de niños (ropa para chicos de 2 a 6 años)
 const KIDS_SIZE_OPTIONS = ['2','3','4','5','6'];
 const SIZE_OPTIONS = [...BABY_SIZE_OPTIONS, ...KIDS_SIZE_OPTIONS, 'Única'];
@@ -998,6 +999,24 @@ const ACCESSORY_SIZE_OPTIONS = ['60 ml','120 ml','150 ml','180 ml','250 ml','270
 const SHOE_SIZE_OPTIONS = Array.from({length:11}, (_,i)=>String(16+i));
 // Medidas de mantas: solo se ofrecen para la categoría Mantas
 const BLANKET_SIZE_OPTIONS = ['Chica','Grande'];
+// Ordena talles y medidas de menor a mayor: talles de bebé, talles de niños,
+// números de calzado, medidas en ml, mantas (Chica, Grande) y por último Única.
+function sizeSortKey(size){
+  const s = String(size||'').trim();
+  let i = BABY_SIZE_OPTIONS.indexOf(s); if(i!==-1) return [0,i];
+  i = KIDS_SIZE_OPTIONS.indexOf(s); if(i!==-1) return [1,i];
+  if(/^\d+([.,]\d+)?$/.test(s)) return [2, parseFloat(s.replace(',','.'))];
+  const ml = s.match(/^(\d+(?:[.,]\d+)?)\s*ml$/i); if(ml) return [3, parseFloat(ml[1].replace(',','.'))];
+  i = BLANKET_SIZE_OPTIONS.indexOf(s); if(i!==-1) return [4,i];
+  if(s.toLowerCase()==='única' || s.toLowerCase()==='unica') return [5,0];
+  return [6,0];
+}
+function sortSizes(list){
+  return (list||[]).map((s,i)=>({s,i,k:sizeSortKey(s)}))
+    .sort((a,b)=>a.k[0]-b.k[0] || a.k[1]-b.k[1] || a.i-b.i)
+    .map(x=>x.s);
+}
+function sortProductSizes(list){ (list||[]).forEach(p=>{ if(p && Array.isArray(p.sizes)) p.sizes = sortSizes(p.sizes); }); return list; }
 // Un producto puede estar en varias categorías (p.types). p.type queda como la principal
 // (la primera elegida) para el ícono y para los productos viejos que solo tienen una.
 function productTypes(p){
@@ -1015,10 +1034,10 @@ function sizeOptionsForOne(type){
 // acepta una categoría o varias: junta los talles/medidas de todas sin repetir
 function sizeOptionsFor(types){
   const list = (Array.isArray(types) ? types : [types]).filter(Boolean);
-  if(!list.length) return SIZE_OPTIONS;
+  if(!list.length) return sortSizes(SIZE_OPTIONS);
   const out = [];
   list.forEach(t=>sizeOptionsForOne(t).forEach(s=>{ if(!out.includes(s)) out.push(s); }));
-  return out;
+  return sortSizes(out);
 }
 const isVolumeSize = size => /ml$/i.test(String(size||'').trim()) || BLANKET_SIZE_OPTIONS.includes(String(size||'').trim());
 const sizeLabel = size => isVolumeSize(size) ? 'Medida' : 'Talle';
@@ -1196,7 +1215,7 @@ function mediaFor(p, fit){
 async function loadData(){
   try{
     const p = await window.storage.get('products', true);
-    products = p ? JSON.parse(p.value) : seedProducts();
+    products = sortProductSizes(p ? JSON.parse(p.value) : seedProducts());
     if(!p){ await window.storage.set('products', JSON.stringify(products), true); }
     await ensureMamaderasOnly();
   }catch(e){
@@ -1251,6 +1270,7 @@ async function ensureMamaderasOnly(){
 
 async function saveProducts(){
   if(window.__catalogLoadFailed){ showToast('⚠️ El catálogo no cargó bien: recargá antes de guardar.'); return false; }
+  sortProductSizes(products);
   try{ await window.storage.set('products', JSON.stringify(products), true); return true; }
   catch(e){ showToast('⚠️ No se pudo guardar el catálogo. Probá de nuevo.'); return false; }
 }
@@ -1264,7 +1284,7 @@ async function saveOrders(){
 async function updateProducts(mutator){
   try{
     const r = await window.storage.get('products', true);
-    if(r) products = JSON.parse(r.value);
+    if(r) products = sortProductSizes(JSON.parse(r.value));
   }catch(e){ showToast('⚠️ No se pudo leer el catálogo. No se guardó nada.'); return false; }
   mutator(products);
   return await saveProducts();
@@ -2437,7 +2457,7 @@ function handleCsvImport(ev){
     }
     try{
       const latest = await window.storage.get('products', true);
-      if(latest) products = JSON.parse(latest.value);
+      if(latest) products = sortProductSizes(JSON.parse(latest.value));
     }catch(e){ showToast('⚠️ No se pudo leer el catálogo. No se importó nada.'); return; }
     let added = 0, skipped = 0;
     let nextId = products.length ? Math.max(...products.map(x=>x.id)) : 0;
@@ -2463,7 +2483,7 @@ function handleCsvImport(ev){
         originalPrice: Number.isFinite(originalPriceRaw) && originalPriceRaw > price ? originalPriceRaw : null,
         wholesalePrice: Number.isFinite(wholesaleRaw) && wholesaleRaw > 0 && wholesaleRaw < price ? wholesaleRaw : null,
         stock: Number.isFinite(stock)?stock:0,
-        sizes: sizes.length?sizes:['Única'], desc,
+        sizes: sizes.length?sortSizes(sizes):['Única'], desc,
         image: null, color: ['sage','blush','sky','honey'][Math.floor(Math.random()*4)]
       });
       added++;
@@ -2605,7 +2625,7 @@ function renderProductForm(id){
   updatePreview();
   // Talles/medidas tildados y precios por medida (se conservan al cambiar de categoría)
   let formTypes = p ? productTypes(p).slice() : [];
-  let formSizes = p ? p.sizes.slice() : [];
+  let formSizes = p ? sortSizes(p.sizes) : [];
   let formSizePrices = p && p.sizePrices ? {...p.sizePrices} : {};
   // Colores y stock por talle + color
   let formColors = p && hasColors(p) ? p.colors.slice() : [];
@@ -2828,7 +2848,7 @@ function renderProductForm(id){
       colors: formColors.length ? formColors.slice() : null,
       variantStock: variantStockData,
       stockGeneral: generalStock,
-      sizes: selectedSizes,
+      sizes: sortSizes(selectedSizes),
       sizePrices: Object.keys(sizePrices).length ? sizePrices : null,
       desc: fd.get('desc'),
       images: productImgs.slice(),
