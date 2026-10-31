@@ -2271,6 +2271,14 @@ function renderAdminProducts(){
       <a href="#" id="csvManualLink" style="display:none;font-size:12px;font-weight:600;color:var(--sage-dark);text-decoration:underline;">¿No se descargó?</a>
       <input type="file" accept=".csv" id="csvFileInput" style="display:none;">
     </div>
+    <div class="backup-box" style="margin-bottom:16px;padding:12px 14px;border:1px solid var(--border);background:var(--sage-tint);border-radius:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+      <div style="flex:1 1 220px;font-size:12.5px;color:var(--text-soft);line-height:1.45;">
+        <strong style="color:inherit;">Respaldo del catálogo.</strong> Descargá una copia de todos los productos (con fotos) cada vez que cargues cosas nuevas, y guardala en tu compu o en Drive.
+      </div>
+      <button class="btn btn-ghost" id="downloadBackupBtn">⬇ Descargar respaldo</button>
+      <button class="small-btn" id="restoreBackupBtn">Restaurar respaldo</button>
+      <input type="file" accept=".json,application/json" id="backupFileInput" style="display:none;">
+    </div>
     <div id="importSummary"></div>
     <div id="productFormWrap"></div>
     <div class="table-wrap">
@@ -2293,6 +2301,9 @@ function renderAdminProducts(){
   document.getElementById('csvManualLink').onclick = (e)=>{ e.preventDefault(); showCsvTemplateManually(); };
   document.getElementById('importCsvBtn').onclick = ()=>document.getElementById('csvFileInput').click();
   document.getElementById('csvFileInput').onchange = handleCsvImport;
+  document.getElementById('downloadBackupBtn').onclick = downloadCatalogBackup;
+  document.getElementById('restoreBackupBtn').onclick = ()=>document.getElementById('backupFileInput').click();
+  document.getElementById('backupFileInput').onchange = handleBackupRestore;
   const body = document.getElementById('adminProductsBody');
   body.innerHTML = products.map(p=>`
     <tr>
@@ -2354,6 +2365,130 @@ function downloadCsvTemplate(){
   showToast('Si no se descargó, revisá tu carpeta de Descargas o usá el link "¿No se descargó?" de abajo');
   const manualLink = document.getElementById('csvManualLink');
   if(manualLink) manualLink.style.display = 'inline';
+}
+
+/* ---------- RESPALDO DEL CATÁLOGO ---------- */
+// El respaldo es un archivo .json con todos los productos. Las fotos se guardan
+// adentro del archivo, así el respaldo sirve aunque se pierdan las de Supabase.
+function blobToDataUrl(blob){
+  return new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>res(r.result);
+    r.onerror = ()=>rej(new Error('No se pudo leer la foto'));
+    r.readAsDataURL(blob);
+  });
+}
+async function imageToDataUrl(src){
+  if(!src || isDataUrl(src)) return src;
+  const res = await fetch(src, { cache: 'no-store' });
+  if(!res.ok) throw new Error('Error ' + res.status);
+  return await blobToDataUrl(await res.blob());
+}
+async function downloadCatalogBackup(ev){
+  const btn = ev && ev.currentTarget;
+  const original = btn ? btn.textContent : '';
+  if(btn) btn.disabled = true;
+  try{
+    // se usa siempre la versión más reciente guardada en la base
+    let list = products;
+    try{
+      const r = await window.storage.get('products', true);
+      if(r) list = JSON.parse(r.value);
+    }catch(e){
+      showToast('⚠️ No se pudo leer el catálogo. Probá de nuevo.');
+      return;
+    }
+    list = JSON.parse(JSON.stringify(list || []));
+    // fotos: se descargan y se meten dentro del respaldo
+    const urls = [];
+    list.forEach(p=>productImages(p).forEach(src=>{ if(src && !isDataUrl(src) && !urls.includes(src)) urls.push(src); }));
+    const map = new Map();
+    let failed = 0;
+    for(let i=0; i<urls.length; i++){
+      if(btn) btn.textContent = `Copiando fotos ${i+1} de ${urls.length}…`;
+      try{ map.set(urls[i], await imageToDataUrl(urls[i])); }
+      catch(e){ failed++; console.error(e); }
+    }
+    const swap = src => map.get(src) || src;
+    list.forEach(p=>{
+      if(Array.isArray(p.images)) p.images = p.images.map(swap);
+      if(p.image) p.image = swap(p.image);
+    });
+    const backup = {
+      app: 'cawdor',
+      kind: 'respaldo-catalogo',
+      version: 1,
+      createdAt: new Date().toISOString(),
+      count: list.length,
+      products: list
+    };
+    const blob = new Blob([JSON.stringify(backup)], {type:'application/json'});
+    const d = new Date();
+    const stamp = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `respaldo-cawdor_${stamp}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
+    if(failed) showToast(`Respaldo descargado (${list.length} productos), pero ${failed} foto${failed!==1?'s':''} no se pudieron copiar y quedaron como link.`);
+    else showToast(`✅ Respaldo descargado: ${list.length} producto${list.length!==1?'s':''}. Guardalo en un lugar seguro.`);
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = original; }
+  }
+}
+async function handleBackupRestore(ev){
+  const input = ev.target;
+  const file = input.files && input.files[0];
+  input.value = '';
+  if(!file) return;
+  let backup;
+  try{ backup = JSON.parse(await file.text()); }
+  catch(e){ showToast('Ese archivo no es un respaldo válido.'); return; }
+  const list = Array.isArray(backup) ? backup : (backup && Array.isArray(backup.products) ? backup.products : null);
+  if(!list || !list.every(p=>p && typeof p === 'object' && p.name && p.id != null)){
+    showToast('Ese archivo no es un respaldo del catálogo de Cawdor.');
+    return;
+  }
+  const when = backup && backup.createdAt ? new Date(backup.createdAt).toLocaleString('es-AR') : 'fecha desconocida';
+  const ok = window.confirm(
+    `Vas a reemplazar el catálogo actual (${products.length} productos) por el del respaldo del ${when} (${list.length} productos).\n\n` +
+    `Los productos que no estén en el respaldo se van a borrar de la tienda. Te recomendamos descargar primero un respaldo del catálogo actual.\n\n¿Querés seguir?`
+  );
+  if(!ok) return;
+  if(window.__catalogLoadFailed){ showToast('⚠️ El catálogo no cargó bien: recargá la página antes de restaurar.'); return; }
+
+  const btn = document.getElementById('restoreBackupBtn');
+  const original = btn ? btn.textContent : '';
+  if(btn) btn.disabled = true;
+  try{
+    // las fotos que vienen dentro del respaldo se vuelven a subir a Supabase
+    const pending = [];
+    list.forEach(p=>productImages(p).forEach(src=>{ if(isDataUrl(src) && !pending.includes(src)) pending.push(src); }));
+    const map = new Map();
+    let failed = 0;
+    for(let i=0; i<pending.length; i++){
+      if(btn) btn.textContent = `Subiendo fotos ${i+1} de ${pending.length}…`;
+      try{ map.set(pending[i], await uploadImage(pending[i])); }
+      catch(e){ failed++; console.error(e); }
+    }
+    const swap = src => map.get(src) || src;
+    list.forEach(p=>{
+      if(Array.isArray(p.images)) p.images = p.images.map(swap);
+      if(p.image) p.image = swap(p.image);
+    });
+    if(btn) btn.textContent = 'Guardando catálogo…';
+    products = sortProductSizes(list);
+    const saved = await saveProducts();
+    renderAdminProducts();
+    renderFilters();
+    renderGrid();
+    if(!saved) return;
+    if(failed) showToast(`Catálogo restaurado, pero ${failed} foto${failed!==1?'s':''} no se pudieron subir. Usá el botón "Pasar fotos a Supabase".`);
+    else showToast(`✅ Catálogo restaurado: ${list.length} producto${list.length!==1?'s':''}.`);
+  }finally{
+    const b = document.getElementById('restoreBackupBtn');
+    if(b){ b.disabled = false; b.textContent = original || 'Restaurar respaldo'; }
+  }
 }
 
 function showCsvTemplateManually(){
