@@ -2070,19 +2070,11 @@ async function handleCheckoutSubmit(e){
       if (!resp.ok || !data.init_point) {
         throw new Error(data.error || 'No se pudo generar el link de pago');
       }
-      // descontar stock y guardar el pedido como pendiente antes de salir hacia Mercado Pago
-      await Promise.all([
-        updateOrders(list=>{ list.push(order); }),
-        updateProducts(list=>{
-          cart.forEach(it=>{
-            const p = list.find(x=>x.id===it.productId);
-            if(p) deductStock(p, it);
-          });
-        })
-      ]);
-      notifyOrderByEmail(order);
-      cart = [];
-      await saveCart();
+      // Se guarda el pedido "esperando pago". El stock NO se toca y el carrito
+      // se mantiene: eso recién pasa cuando Mercado Pago aprueba el pago.
+      order.status = 'esperando pago';
+      const saved = await updateOrders(list=>{ list.push(order); });
+      if (!saved) throw new Error('No se pudo registrar el pedido. Probá de nuevo.');
       window.location.href = data.init_point;
     } catch (err) {
       if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = `Confirmar pedido — ${money(getOrderTotal())}`; }
@@ -2128,7 +2120,7 @@ async function finalizeOrder(order){
   showConfirmation(order);
 }
 function showConfirmation(order){
-  const payLabel = {transferencia:'Transferencia bancaria', debito:'Tarjeta de débito', tarjeta:'Tarjeta de crédito', gocuotas:'GOcuotas'}[order.paymentMethod];
+  const payLabel = {transferencia:'Transferencia bancaria', debito:'Tarjeta de débito', tarjeta:'Tarjeta de crédito', gocuotas:'GOcuotas', mercadopago:'Mercado Pago'}[order.paymentMethod];
   document.getElementById('checkoutModal').innerHTML = `
     <button class="modal-close" id="closeConfirm">✕</button>
     <div class="confirm-screen">
@@ -2136,6 +2128,8 @@ function showConfirmation(order){
       <h2 style="font-size:22px;">¡Pedido confirmado!</h2>
       ${WA_PAY_METHODS.includes(order.paymentMethod)
         ? `<p class="pm-desc">Número de pedido <strong>${order.id}</strong>. Vas a pagar por <strong>${payLabel}</strong>. <strong>Último paso:</strong> envianos el pedido por WhatsApp y te respondemos con el link de pago.</p>`
+        : order.paymentMethod === 'mercadopago'
+        ? `<p class="pm-desc">Número de pedido <strong>${order.id}</strong>. Tu pago con <strong>Mercado Pago</strong> fue aprobado. Te escribimos a ${order.customer.email} con los detalles.</p>`
         : `<p class="pm-desc">Número de pedido <strong>${order.id}</strong>. Vas a pagar por <strong>${payLabel}</strong>. Te escribimos a ${order.customer.email} con los detalles.</p>`}
       <div style="text-align:left;background:var(--bg-alt);border-radius:12px;padding:16px 18px;margin:20px 0;">
         ${order.items.map(i=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;"><span>${i.qty}× ${i.name} (${i.size}${i.color?' · '+i.color:''})</span><span>${money(i.price*i.qty)}</span></div>`).join('')}
@@ -3270,7 +3264,89 @@ document.getElementById('footerFaq').onclick = (e)=>{
   }, 4000);
 })();
 
-loadData();
+/* ---------- VUELTA DESDE MERCADO PAGO ---------- */
+// Mercado Pago vuelve a la web con datos en la URL, por ejemplo:
+// ?status=approved&payment_id=123&external_reference=RT-12345678
+// El estado se confirma con el servidor (/api/verify-payment), que es quien descuenta
+// el stock. El webhook (/api/mp-webhook) hace lo mismo aunque el cliente no vuelva.
+async function handleMercadoPagoReturn(){
+  const params = new URLSearchParams(window.location.search);
+  const urlStatus = params.get('status') || params.get('collection_status');
+  const orderId = params.get('external_reference');
+  const paymentId = params.get('payment_id') || params.get('collection_id');
+  if(!urlStatus && !orderId) return;
+
+  // Limpiar la URL para que el mensaje no se repita al recargar
+  window.history.replaceState({}, document.title, window.location.pathname);
+
+  let status = urlStatus;
+  if(paymentId && paymentId !== 'null'){
+    try{
+      const r = await fetch('/api/verify-payment?payment_id=' + encodeURIComponent(paymentId), { cache:'no-store' });
+      const v = await r.json();
+      if(!r.ok) throw new Error(v.error || 'verificación fallida');
+      status = (v.external_reference && orderId && v.external_reference !== orderId) ? 'rejected' : v.status;
+    }catch(e){
+      console.error(e);
+      // Si no se pudo verificar, no se descuenta stock: se muestra como "en proceso"
+      if(status === 'approved') status = 'unverified';
+    }
+  } else if(status === 'approved'){
+    status = 'unverified';
+  }
+
+  const order = orders.find(o => o.id === orderId);
+
+  if(status === 'approved'){
+    // El servidor ya marcó el pedido como pagado y descontó el stock.
+    // Acá solo se refresca el catálogo y se vacía el carrito.
+    try{
+      const r = await window.storage.get('products', true);
+      if(r) products = sortProductSizes(JSON.parse(r.value));
+    }catch(e){}
+    cart = [];
+    await saveCart();
+    updateCartCount();
+    renderGrid();
+    if(order){
+      showConfirmation(order);
+      document.getElementById('checkoutOverlay').classList.add('open');
+      return;
+    }
+  }
+
+  const retry = 'Tus productos siguen en el carrito para que puedas intentarlo de nuevo.';
+  const messages = {
+    approved:   {title:'¡Pago aprobado!', text:'Recibimos tu pago. Te escribimos por mail con los detalles del pedido.', cart:false},
+    pending:    {title:'Pago en proceso', text:'Mercado Pago todavía está procesando tu pago. Te avisamos por mail apenas se acredite.', cart:false},
+    in_process: {title:'Pago en proceso', text:'Mercado Pago todavía está procesando tu pago. Te avisamos por mail apenas se acredite.', cart:false},
+    unverified: {title:'Estamos confirmando tu pago', text:'No pudimos confirmar el pago con Mercado Pago todavía. Si se aprobó, te escribimos por mail con los detalles.', cart:false},
+    rejected:   {title:'El pago fue rechazado', text:'Mercado Pago no aprobó el pago. ' + retry, cart:true},
+    cancelled:  {title:'El pago fue cancelado', text:retry, cart:true},
+    failure:    {title:'El pago no se completó', text:'Hubo un problema con el pago. ' + retry, cart:true},
+    'null':     {title:'El pago no se completó', text:'Saliste de Mercado Pago sin terminar el pago. ' + retry, cart:true}
+  };
+  const m = messages[status] || messages.failure;
+  document.getElementById('checkoutModal').innerHTML = `
+    <button class="modal-close" id="closeMpReturn">✕</button>
+    <div class="confirm-screen">
+      <h2 style="font-size:22px;">${m.title}</h2>
+      <p class="pm-desc">${orderId ? `Número de pedido <strong>${orderId}</strong>. ` : ''}${m.text}</p>
+      ${m.cart
+        ? `<button class="btn btn-sage" id="mpReturnCart" style="width:100%;justify-content:center;margin-bottom:10px;">Ver carrito</button>
+           <button class="clear-cart-link" id="mpReturnContinue">Seguir comprando</button>`
+        : `<button class="btn btn-sage" id="mpReturnContinue">Seguir comprando</button>`}
+    </div>
+  `;
+  const close = ()=>document.getElementById('checkoutOverlay').classList.remove('open');
+  document.getElementById('closeMpReturn').onclick = close;
+  document.getElementById('mpReturnContinue').onclick = close;
+  const cartBtn = document.getElementById('mpReturnCart');
+  if(cartBtn) cartBtn.onclick = ()=>{ close(); document.getElementById('cartBtn').click(); };
+  document.getElementById('checkoutOverlay').classList.add('open');
+}
+
+loadData().then(handleMercadoPagoReturn, handleMercadoPagoReturn);
 </script>
 </body>
 </html>
