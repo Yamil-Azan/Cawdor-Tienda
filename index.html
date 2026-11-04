@@ -3077,6 +3077,16 @@ function showOrderDetail(orderId){
 
       ${o.notes ? `<div class="eyebrow" style="margin:16px 0 8px;">Notas</div><p style="font-size:13.5px;">${o.notes}</p>` : ''}
 
+      <div class="eyebrow" style="margin:16px 0 8px;">Estado del pago</div>
+      <div style="background:var(--bg-alt);border-radius:12px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-size:13.5px;"><span class="status-pill${o.status === 'pagado' ? ' paid' : ''}">${o.status}</span>${o.status==='pagado' && o.paidAt ? `<span style="font-size:11.5px;color:var(--text-soft);margin-left:8px;">el ${new Date(o.paidAt).toLocaleDateString('es-AR')}</span>` : ''}</span>
+        ${o.paymentMethod==='mercadopago'
+          ? `<span style="font-size:11.5px;color:var(--text-soft);">Se actualiza solo cuando Mercado Pago aprueba el pago.</span>`
+          : (o.status==='pagado'
+              ? `<button type="button" class="small-btn" id="toggleOrderPaidBtn" data-next="pendiente">Volver a pendiente</button>`
+              : `<button type="button" class="btn btn-sage" id="toggleOrderPaidBtn" data-next="pagado">Marcar como pagado</button>`)}
+      </div>
+
       <div class="eyebrow" style="margin:16px 0 8px;">${isGc ? 'Cobrar con GOcuotas' : 'Cobrar con Mercado Pago'}</div>
       <div style="background:var(--bg-alt);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -3096,6 +3106,26 @@ function showOrderDetail(orderId){
   `;
   document.getElementById('closeOrderDetail').onclick = ()=>document.getElementById('productOverlay').classList.remove('open');
   document.getElementById('productOverlay').classList.add('open');
+
+  const togglePaidBtn = document.getElementById('toggleOrderPaidBtn');
+  if(togglePaidBtn){
+    togglePaidBtn.onclick = async ()=>{
+      const next = togglePaidBtn.dataset.next;
+      if(next==='pagado' && !confirm(`¿Confirmás que ya recibiste el pago de ${money(o.total)} del pedido ${o.id}?`)) return;
+      togglePaidBtn.disabled = true;
+      const ok = await updateOrders(list=>{
+        const target = list.find(x=>x.id===orderId);
+        if(!target) return;
+        target.status = next;
+        if(next==='pagado') target.paidAt = new Date().toISOString();
+        else delete target.paidAt;
+      });
+      if(!ok){ togglePaidBtn.disabled = false; return; }
+      renderAdminOrders();
+      showOrderDetail(orderId);
+      showToast(next==='pagado' ? `Pedido ${orderId} marcado como pagado` : `Pedido ${orderId} volvió a pendiente`);
+    };
+  }
 
   const copyAmountBtn = document.getElementById('copyAmountBtn');
   if(copyAmountBtn){
