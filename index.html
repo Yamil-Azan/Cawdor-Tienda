@@ -3030,7 +3030,7 @@ function renderAdminOrders(){
             <tr>
               <td style="font-size:12px;">${o.id}<br><span style="color:var(--text-soft);font-size:10.5px;">${new Date(o.date).toLocaleDateString('es-AR')}</span></td>
               <td style="overflow:hidden;"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${o.customer.name}</div><span style="color:var(--text-soft);font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">${o.customer.email}</span></td>
-              <td style="font-size:12px;overflow-wrap:break-word;">${({transferencia:'Transferencia',debito:'Tarjeta débito',tarjeta:'Tarjeta crédito',gocuotas:'GOcuotas',mercadopago:'Mercado Pago'})[o.paymentMethod] || o.paymentMethod || '—'}</td>
+              <td style="font-size:12px;overflow-wrap:break-word;">${({transferencia:'Transferencia',debito:'Tarjeta débito',tarjeta:'Tarjeta crédito',gocuotas:'GOcuotas',mercadopago:'Mercado Pago'})[o.paymentMethod] || o.paymentMethod || '—'}${o.paymentMethod==='gocuotas' ? `<br><span style="font-weight:700;font-size:11px;">${o.gocuotasInstallments ? `${o.gocuotasInstallments} ${o.gocuotasInstallments===1?'cuota':'cuotas'}` : 'Cuotas sin dato'}</span>` : ''}${o.paymentMethod==='tarjeta' && o.cardInstallments ? `<br><span style="font-weight:700;font-size:11px;">${o.cardInstallments} ${o.cardInstallments===1?'cuota':'cuotas'}</span>` : ''}</td>
               <td style="font-weight:700;white-space:nowrap;">${money(o.total)}</td>
               <td class="admin-notes-cell">${o.notes ? o.notes : '—'}</td>
               <td><span class="status-pill${o.status === 'pagado' ? ' paid' : ''}">${o.status}</span></td>
@@ -3062,6 +3062,7 @@ function showOrderDetail(orderId){
       <div style="background:var(--bg-alt);border-radius:12px;padding:14px 16px;">
         ${o.items.map(i=>`<div style="display:flex;justify-content:space-between;font-size:13.5px;padding:5px 0;"><span>${i.qty}× ${i.name} (${i.size}${i.color?' · '+i.color:''})</span><span>${money(i.price*i.qty)}</span></div>`).join('')}
         ${o.cardInstallments ? `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;color:var(--text-soft);"><span>${o.cardInstallments} cuota${o.cardInstallments>1?'s':''} con tarjeta</span><span>${money(o.total - o.items.reduce((s,i)=>s+i.price*i.qty,0))} recargo</span></div>` : ''}
+        ${isGc && o.gocuotasInstallments ? `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;color:var(--text-soft);"><span>GOcuotas: ${o.gocuotasInstallments} ${o.gocuotasInstallments===1?'cuota':'cuotas'} sin interés</span><span>${moneyCents(o.total/o.gocuotasInstallments)} c/u</span></div>` : ''}
         <div style="display:flex;justify-content:space-between;font-weight:800;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);"><span>Total</span><span>${money(o.total)}</span></div>
       </div>
 
@@ -3072,7 +3073,7 @@ function showOrderDetail(orderId){
       <p style="font-size:13.5px;">${o.address.street}, ${o.address.city}, ${o.address.province} (CP ${o.address.zip})</p>
 
       <div class="eyebrow" style="margin:16px 0 8px;">Método de pago</div>
-      <p style="font-size:13.5px;">${payLabel}</p>
+      <p style="font-size:13.5px;">${payLabel}${isGc ? (o.gocuotasInstallments ? ` — <strong>${o.gocuotasInstallments} ${o.gocuotasInstallments===1?'cuota':'cuotas'} sin interés</strong>` : ' — <span style="color:var(--text-soft);">la clienta no eligió cantidad de cuotas (pedido anterior al cambio)</span>') : ''}</p>
 
       ${o.notes ? `<div class="eyebrow" style="margin:16px 0 8px;">Notas</div><p style="font-size:13.5px;">${o.notes}</p>` : ''}
 
