@@ -58,12 +58,20 @@ module.exports = async (req, res) => {
       items: mpItems,
       payer: payer && payer.email ? { email: payer.email, name: payer.name, phone: { number: payer.phone } } : undefined,
       external_reference: orderId || undefined,
+      // Adónde vuelve el cliente. Mercado Pago agrega a estas direcciones
+      // los datos del pago (status, payment_id, external_reference),
+      // que la tienda usa para mostrar el mensaje correcto.
       back_urls: {
         success: `${baseUrl}/?pago=exito&pedido=${encodeURIComponent(orderId || '')}`,
         pending: `${baseUrl}/?pago=pendiente&pedido=${encodeURIComponent(orderId || '')}`,
         failure: `${baseUrl}/?pago=error&pedido=${encodeURIComponent(orderId || '')}`
       },
       auto_return: 'approved',
+      // El pago se resuelve al momento: aprobado o rechazado, sin "pendiente".
+      binary_mode: true,
+      // Adónde avisa Mercado Pago cuando cambia el pago (webhook),
+      // aunque el cliente cierre la pestaña y no vuelva a la web.
+      notification_url: `${baseUrl}/api/mp-webhook`,
       payment_methods: {
         installments: Number.isFinite(Number(installments)) && Number(installments) > 0 ? Number(installments) : 12
       }
