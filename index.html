@@ -1927,6 +1927,7 @@ function gcInfoPanelHtml(){
 /* ---------- PÁGINA DE CUOTAS GOCUOTAS ---------- */
 let gcPendingOrder = null;
 let gcSelectedInstallments = GOCUOTAS_INSTALLMENTS;
+let gcSaving = false;
 function openGocuotasPage(order){
   gcPendingOrder = order;
   gcSelectedInstallments = GOCUOTAS_INSTALLMENTS;
@@ -1979,9 +1980,23 @@ function renderGocuotasPage(){
   });
   document.getElementById('gcContinue').onclick = async ()=>{
     const order = gcPendingOrder;
+    if(!order || gcSaving) return;
+    gcSaving = true;
+    // La página queda abierta y bloqueada mientras se guarda el pedido. Antes se
+    // cerraba enseguida y la clienta volvía al checkout con el botón activo y el
+    // carrito lleno: si tocaba de nuevo, se creaba un pedido duplicado.
+    const btn = document.getElementById('gcContinue');
+    btn.disabled = true;
+    btn.textContent = 'Guardando tu pedido...';
+    document.getElementById('gcBack').disabled = true;
+    document.querySelectorAll('#gcPage .gc-option').forEach(b=>b.disabled = true);
     order.gocuotasInstallments = gcSelectedInstallments;
-    closeGocuotasPage();
-    await finalizeOrder(order);
+    try{
+      await finalizeOrder(order);
+    } finally {
+      gcSaving = false;
+      closeGocuotasPage();
+    }
   };
 }
 function payOption(value,title,badge,icon){
@@ -2089,6 +2104,14 @@ async function handleCheckoutSubmit(e){
   if (payMethod === 'gocuotas') {
     openGocuotasPage(order);
     return;
+  }
+  // Transferencia y demás: se bloquea el botón mientras se guarda para que un
+  // doble toque (o tocar de nuevo porque tarda) no genere un pedido duplicado.
+  const submitBtn = document.getElementById('confirmOrderBtn');
+  if (submitBtn) {
+    if (submitBtn.disabled) return;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Guardando tu pedido...';
   }
   await finalizeOrder(order);
 }
