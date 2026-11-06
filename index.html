@@ -975,7 +975,7 @@ const TYPE_LABELS = {
 };
 // Categorías ordenadas alfabéticamente por el nombre que se muestra
 const TYPE_ORDER = Object.keys(TYPE_LABELS).sort((a,b)=>TYPE_LABELS[a].localeCompare(TYPE_LABELS[b],'es',{sensitivity:'base'}));
-const BABY_SIZE_OPTIONS = ['RN','0','1','0-3M','3-6M','3-8M','6-9M','6-12M','9-12M','12-18M','18-24M','24-36M'];
+const BABY_SIZE_OPTIONS = ['RN','0','1','0-3M','0-6M','3-6M','3-8M','6-9M','6-12M','9-12M','12-18M','18-24M','24-36M'];
 // Talles de niños (ropa para chicos de 2 a 6 años)
 const KIDS_SIZE_OPTIONS = ['2','3','4','5','6'];
 const SIZE_OPTIONS = [...BABY_SIZE_OPTIONS, ...KIDS_SIZE_OPTIONS, 'Única'];
@@ -984,7 +984,9 @@ const isBabySize = size => BABY_SIZE_OPTIONS.includes(String(size||'').trim());
 // Grupo de edad de un producto: 'ninos' si tiene algún talle 2 a 6, 'bebes' si tiene talles de bebé.
 // Los productos de talle Única o medidas en ml se consideran de bebé.
 function productAgeGroups(p){
-  const sizes = p.sizes || [];
+  let sizes = p.sizes || [];
+  // En calzado, los talles 1 y 2 son de bebé (no confundir con el talle 2 de ropa de niños)
+  if(productTypes(p).includes('calzado')) sizes = sizes.map(s=>BABY_SHOE_SIZE_OPTIONS.includes(String(s).trim()) ? '1' : s);
   const groups = new Set();
   if(sizes.some(isKidsSize)) groups.add('ninos');
   if(sizes.some(isBabySize) || !sizes.some(isKidsSize)) groups.add('bebes');
@@ -997,8 +999,10 @@ const AGE_FILTERS = [
 ];
 // Medidas en ml: solo se ofrecen para la categoría Accesorios (mamaderas, vasitos, etc.)
 const ACCESSORY_SIZE_OPTIONS = ['60 ml','120 ml','150 ml','180 ml','250 ml','270 ml','330 ml'];
-// Talles de calzado: solo se ofrecen para la categoría Calzados (del 16 al 26)
-const SHOE_SIZE_OPTIONS = Array.from({length:11}, (_,i)=>String(16+i));
+// Talles de calzado: solo se ofrecen para la categoría Calzados.
+// Calzado de bebé: talles 1 y 2. Después, del 16 al 26.
+const BABY_SHOE_SIZE_OPTIONS = ['1','2'];
+const SHOE_SIZE_OPTIONS = [...BABY_SHOE_SIZE_OPTIONS, ...Array.from({length:11}, (_,i)=>String(16+i))];
 // Medidas de mantas: solo se ofrecen para la categoría Mantas
 const BLANKET_SIZE_OPTIONS = ['Chica','Grande'];
 // Ordena talles y medidas de menor a mayor: talles de bebé, talles de niños,
