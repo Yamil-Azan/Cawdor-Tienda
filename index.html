@@ -985,8 +985,8 @@ const isBabySize = size => BABY_SIZE_OPTIONS.includes(String(size||'').trim());
 // Los productos de talle Única o medidas en ml se consideran de bebé.
 function productAgeGroups(p){
   let sizes = p.sizes || [];
-  // En calzado, los talles 1 y 2 son de bebé (no confundir con el talle 2 de ropa de niños)
-  if(productTypes(p).includes('calzado')) sizes = sizes.map(s=>BABY_SHOE_SIZE_OPTIONS.includes(String(s).trim()) ? '1' : s);
+  // Los talles de calzado de bebé (1 y 2) cuentan como talles de bebé
+  sizes = sizes.map(s=>BABY_SHOE_SIZE_OPTIONS.includes(String(s).trim()) ? '1' : s);
   const groups = new Set();
   if(sizes.some(isKidsSize)) groups.add('ninos');
   if(sizes.some(isBabySize) || !sizes.some(isKidsSize)) groups.add('bebes');
@@ -1000,8 +1000,9 @@ const AGE_FILTERS = [
 // Medidas en ml: solo se ofrecen para la categoría Accesorios (mamaderas, vasitos, etc.)
 const ACCESSORY_SIZE_OPTIONS = ['60 ml','120 ml','150 ml','180 ml','250 ml','270 ml','330 ml'];
 // Talles de calzado: solo se ofrecen para la categoría Calzados.
-// Calzado de bebé: talles 1 y 2. Después, del 16 al 26.
-const BABY_SHOE_SIZE_OPTIONS = ['1','2'];
+// Calzado de bebé: Talle 1 (0-6M) y Talle 2 (6-12M). Después, del 16 al 26.
+// (la palabra "Talle" la agrega la web al mostrarlo, por eso no va en el valor)
+const BABY_SHOE_SIZE_OPTIONS = ['1 (0-6M)','2 (6-12M)'];
 const SHOE_SIZE_OPTIONS = [...BABY_SHOE_SIZE_OPTIONS, ...Array.from({length:11}, (_,i)=>String(16+i))];
 // Medidas de mantas: solo se ofrecen para la categoría Mantas
 const BLANKET_SIZE_OPTIONS = ['Chica','Grande'];
@@ -1010,6 +1011,7 @@ const BLANKET_SIZE_OPTIONS = ['Chica','Grande'];
 function sizeSortKey(size){
   const s = String(size||'').trim();
   let i = BABY_SIZE_OPTIONS.indexOf(s); if(i!==-1) return [0,i];
+  i = BABY_SHOE_SIZE_OPTIONS.indexOf(s); if(i!==-1) return [2, i-100]; // antes del 16
   i = KIDS_SIZE_OPTIONS.indexOf(s); if(i!==-1) return [1,i];
   if(/^\d+([.,]\d+)?$/.test(s)) return [2, parseFloat(s.replace(',','.'))];
   const ml = s.match(/^(\d+(?:[.,]\d+)?)\s*ml$/i); if(ml) return [3, parseFloat(ml[1].replace(',','.'))];
