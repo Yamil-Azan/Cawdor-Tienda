@@ -1382,7 +1382,7 @@ function renderGrid(){
     const entry = variable ? null : cartEntryFor(p.id, p.sizes[0]);
     const qty = entry ? entry.qty : 0;
     const controls = variable
-      ? `<button class="buy-btn" data-open="${p.id}" ${p.stock===0?'disabled':''}>${p.stock===0?'Sin stock':(hasColors(p)?'Elegir talle y color':'Elegir medida')}</button>`
+      ? `<button class="buy-btn" data-open="${p.id}" ${p.stock===0?'disabled':''}>${p.stock===0?'Sin stock':(p.noSize?'Elegir color':(hasColors(p)?'Elegir talle y color':'Elegir medida'))}</button>`
       : qty > 0
       ? `<div class="grid-qty">
           <button class="grid-qty-btn minus" data-dec-grid="${p.id}">−</button>
@@ -1520,8 +1520,8 @@ function renderProductModal(){
       <p class="pm-desc" style="white-space:pre-line;">${p.desc}</p>
       ${colored ? `<div class="eyebrow">Color</div>
       <div class="size-row" id="colorRow">${p.colors.map(c=>{ const out = colorStock(p,c)===0; return `<button class="size-btn color-btn ${c===selectedColor?'active':''}" data-color="${c}" ${out?'disabled title="Sin stock"':''}>${c}</button>`; }).join('')}</div>` : ''}
-      <div class="eyebrow">${p.sizes.every(isVolumeSize) ? 'Medida' : 'Talle'}</div>
-      <div class="size-row" id="sizeRow">${p.sizes.map(s=>{ const out = colored && variantStock(p,s,selectedColor)===0; return `<button class="size-btn ${s===selectedSize?'active':''}" data-size="${s}" ${out?'disabled title="No hay en este color"':''}>${s}</button>`; }).join('')}</div>
+      <div class="eyebrow"${p.noSize?' style="display:none"':''}>${p.sizes.every(isVolumeSize) ? 'Medida' : 'Talle'}</div>
+      <div class="size-row" id="sizeRow"${p.noSize?' style="display:none"':''}>${p.sizes.map(s=>{ const out = colored && variantStock(p,s,selectedColor)===0; return `<button class="size-btn ${s===selectedSize?'active':''}" data-size="${s}" ${out?'disabled title="No hay en este color"':''}>${s}</button>`; }).join('')}</div>
       <div class="eyebrow">Cantidad</div>
       <div class="qty-row">
         <div class="qty-control">
@@ -2708,7 +2708,8 @@ function renderProductForm(id){
           <div class="field"><label>Precio mayorista (opcional)</label><input type="number" min="0" name="wholesalePrice" value="${p&&p.wholesalePrice?p.wholesalePrice:''}" placeholder="Dejar vacío si no tiene"><span style="font-size:11px;color:var(--text-soft);display:block;margin-top:4px;">Precio por unidad cuando el cliente lleva ${WHOLESALE_MIN_QTY} o más de este producto (sumando talles).</span><span id="wholesaleError" class="field-error-msg"></span></div>
           <div class="field" id="plainStockField"><label>Stock</label><input type="number" min="0" name="stock" value="${p?p.stock:''}"><span id="stockError" class="field-error-msg"></span></div>
           <div class="field full">
-            <label>Talles o medidas disponibles</label>
+            <label>Talles o medidas disponibles (opcional)</label>
+            <span style="font-size:11.5px;color:var(--text-soft);display:block;margin-bottom:6px;">Si el producto no tiene talle ni medida, dejalo sin tildar.</span>
             <div class="size-checkbox-row" id="sizeCheckboxRow"></div>
             <span id="sizesError" class="field-error-msg"></span>
           </div>
@@ -2779,7 +2780,7 @@ function renderProductForm(id){
   updatePreview();
   // Talles/medidas tildados y precios por medida (se conservan al cambiar de categoría)
   let formTypes = p ? productTypes(p).slice() : [];
-  let formSizes = p ? sortSizes(p.sizes) : [];
+  let formSizes = p && !p.noSize ? sortSizes(p.sizes) : [];
   let formSizePrices = p && p.sizePrices ? {...p.sizePrices} : {};
   // Colores y stock por talle + color
   let formColors = p && hasColors(p) ? p.colors.slice() : [];
@@ -2930,12 +2931,10 @@ function renderProductForm(id){
       document.getElementById('typeCheckboxRow').scrollIntoView({block:'center', behavior:'smooth'});
       return;
     }
-    if(selectedSizes.length === 0){
-      const err = document.getElementById('sizesError');
-      err.textContent = 'Elegí al menos un talle';
-      err.classList.add('show');
-      return;
-    }
+    // El talle/medida es opcional: si no se elige ninguno, se guarda internamente como 'Única'
+    // (así el carrito, el stock y los precios siguen funcionando) y se marca como "sin talle".
+    const noSize = selectedSizes.length === 0;
+    if(noSize) selectedSizes.push('Única');
     // stock: por talle + color si el producto tiene colores, o un único número si no
     if(document.getElementById('colorNameInput').value.trim()) addColorsFromInput();
     readVariantInputs();
@@ -3003,6 +3002,7 @@ function renderProductForm(id){
       variantStock: variantStockData,
       stockGeneral: generalStock,
       sizes: sortSizes(selectedSizes),
+      noSize,
       sizePrices: Object.keys(sizePrices).length ? sizePrices : null,
       desc: fd.get('desc'),
       images: productImgs.slice(),
