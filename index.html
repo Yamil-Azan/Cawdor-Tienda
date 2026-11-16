@@ -326,6 +326,8 @@
   .wholesale-hint{font-size:11.5px;color:#3E6C86;font-weight:600;margin-top:6px;}
   html[data-theme="dark"] .wholesale-hint{color:#A8C5D6;}
   .wholesale-tag{font-size:10px;font-weight:800;color:var(--sage-dark);background:var(--sage-tint);padding:1px 6px;border-radius:6px;margin-left:4px;}
+  .shipping-note{font-size:12.5px;font-weight:600;color:var(--text-soft);text-align:center;margin:0 0 12px;}
+  .shipping-note.in-total{text-align:right;font-size:12px;font-weight:600;margin:4px 0 0;}
   .savings-row{display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:var(--sage-dark);margin:-6px 0 12px;}
   .empty-state{
     text-align:center;padding:60px 20px;color:var(--text-soft);
@@ -1658,6 +1660,7 @@ function renderDrawer(){
   ` : `
     <div class="subtotal-row"><span>Subtotal</span><span>${money(total)}</span></div>
     ${wholesaleSavings() > 0 ? `<div class="savings-row"><span>Ahorro por precio mayorista</span><span>−${money(wholesaleSavings())}</span></div>` : ''}
+    <p class="shipping-note">El envío no está incluido en el precio.</p>
     <button class="btn btn-sage" style="width:100%;justify-content:center;" id="goCheckout">Ir a pagar</button>
     <button class="clear-cart-link" id="clearCart">Vaciar carrito</button>
   `;
@@ -1758,6 +1761,7 @@ function renderCheckout(){
           ${payOption('gocuotas','GOcuotas', `Hasta ${GOCUOTAS_INSTALLMENTS} cuotas sin interés, mismo precio publicado`, PAY_ICONS.calendar)}
           <div id="gcInfoPanel" style="display:${payMethod==='gocuotas'?'block':'none'};">${gcInfoPanelHtml()}</div>
         </div>
+        <p class="shipping-note">⚠️ El total no incluye el costo de envío. Te lo informamos aparte.</p>
         <button type="submit" class="btn btn-sage" style="width:100%;justify-content:center;" id="confirmOrderBtn">Confirmar pedido — ${money(getOrderTotal())}</button>
         </div>
       </form>
@@ -1912,7 +1916,7 @@ function buildOrderWhatsappMessage(order){
     'Prendas:',
     ...order.items.map(i=>`• ${i.qty}× ${i.name} (${sizeLabel(i.size).toLowerCase()} ${i.size}${i.color?', '+i.color:''})${i.wholesale?' [precio mayorista]':''} — ${money(i.price*i.qty)}`),
     '',
-    `Total: ${money(order.total)}`,
+    `Total: ${money(order.total)} (no incluye envío)`,
     '',
     `Nombre: ${order.customer.name}`,
     `Envío: ${order.address.street}, ${order.address.city}, ${order.address.province} (CP ${order.address.zip})`
@@ -2192,6 +2196,7 @@ function showConfirmation(order){
         ${order.paymentMethod==='tarjeta' ? `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;color:var(--text-soft);"><span>${order.cardInstallments} cuota${order.cardInstallments>1?'s':''} con tarjeta</span><span>${money(order.total - order.items.reduce((s,i)=>s+i.price*i.qty,0))} recargo</span></div>` : ''}
         ${order.paymentMethod==='gocuotas' && order.gocuotasInstallments ? `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;color:var(--text-soft);"><span>GOcuotas: ${order.gocuotasInstallments} ${order.gocuotasInstallments===1?'cuota':'cuotas'} sin interés</span><span>${moneyCents(order.total/order.gocuotasInstallments)} c/u</span></div>` : ''}
         <div style="display:flex;justify-content:space-between;font-weight:800;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);"><span>Total</span><span>${money(order.total)}</span></div>
+        <div class="shipping-note in-total">El envío no está incluido.</div>
       </div>
       ${order.notes ? `<div style="text-align:left;font-size:12.5px;color:var(--text-soft);margin-bottom:16px;"><strong style="color:var(--text);">Notas:</strong> ${order.notes}</div>` : ''}
       ${WA_PAY_METHODS.includes(order.paymentMethod) ? `
